@@ -10,33 +10,38 @@
     <div id="game-container">
         <div id="weather-bar">
             <span><span id="w-icon">☀️</span> <span id="w-text">晴朗</span></span>
-            <button id="quest-btn" onclick="showQuestDetail()">📜 任務資訊</button>
+            <button id="quest-btn" type="button" onclick="showQuestDetail()">📜 任務資訊</button>
             <span><span id="v-job" style="color:var(--r-rare)"></span> / <span id="v-mbti" class="c-mbti"></span> <span id="v-status-extra" style="color:#f44"></span></span>
         </div>
 
         <div id="header">
-            <div class="stat-box"><span class="stat-lbl">Day</span><span class="stat-val" id="v-day">0</span></div>
-            <div class="stat-box"><span class="stat-lbl">HP</span><span class="stat-val" style="color:var(--hp-color)"><span id="v-hp">100</span>/<span id="v-max-hp">100</span></span></div>
-            <div class="stat-box"><span class="stat-lbl">SAN</span><span class="stat-val" style="color:var(--san-color)" id="v-san">100</span></div>
-            <div class="stat-box" onclick="showStats()"><span class="stat-lbl">Lv. <span id="v-lvl" style="color:#fff">1</span></span><span class="stat-val" id="v-stats">屬性</span></div>
-            <div class="stat-box"><span class="stat-lbl">XP</span><span class="stat-val" id="v-xp" style="color:var(--xp-color)">0/20</span></div>
-            <div class="stat-box"><span class="stat-lbl">物資</span><span class="stat-val"><span id="v-food">100</span>/<span id="v-water">100</span></span>
-    </div>
-    <div class="stat-box"><span class="stat-lbl">💰 金錢</span><span class="stat-val" id="v-money" style="color:#ffd700">0</span></div>
+            <button id="stat-btn" type="button" onclick="collapseStat()">🔽 現在資訊</button>
+            <div id="stat-bar">
+                <div class="stat-box"><span class="stat-lbl">Day</span><span class="stat-val" id="v-day">0</span></div>
+                <div class="stat-box"><span class="stat-lbl">HP</span><span class="stat-val" style="color:var(--hp-color)"><span id="v-hp">100</span>/<span id="v-max-hp">100</span></span></div>
+                <div class="stat-box"><span class="stat-lbl">SAN</span><span class="stat-val" style="color:var(--san-color)" id="v-san">100</span></div>
+                <div class="stat-box" onclick="showStats()"><span class="stat-lbl">Lv. <span id="v-lvl" style="color:#fff">1</span></span><span class="stat-val" id="v-stats">屬性</span></div>
+                <div class="stat-box"><span class="stat-lbl">XP</span><span class="stat-val" id="v-xp" style="color:var(--xp-color)">0/20</span></div>
+                <div class="stat-box"><span class="stat-lbl">物資</span><span class="stat-val"><span id="v-food">100</span>/<span id="v-water">100</span></span></div>
+                <div class="stat-box"><span class="stat-lbl">💰 金錢</span><span class="stat-val" id="v-money" style="color:#ffd700">0</span></div>
+            </div>
         </div>
         
         <div id="equip-bar">
-            <div class="eq-row" onclick="showItemDetail('melee')">
-                <span class="eq-label">⚔️ 近戰</span><span id="eq-melee" class="eq-val q0">(未裝備)</span>
-                <div id="tag-melee" class="mastery-tag" style="display:none">專精</div>
+            <button id="equip-btn" type="button" onclick="collapseEquip()">🔽 裝備</button>
+            <div id="equip-container">
+                <div class="eq-row" onclick="showItemDetail('melee')">
+                    <span class="eq-label">⚔️ 近戰</span><span id="eq-melee" class="eq-val q0">(未裝備)</span>
+                    <div id="tag-melee" class="mastery-tag" style="display:none">專精</div>
+                </div>
+                <div class="eq-row" onclick="showItemDetail('ranged')">
+                    <span class="eq-label">🔫 遠程</span><span class="eq-val"><span id="eq-ranged" class="q0">(未裝備)</span> <span id="v-ammo" style="color:#666;font-size:0.8em;font-weight:normal">(0)</span></span>
+                    <div id="tag-ranged" class="mastery-tag" style="display:none">專精</div>
+                </div>
+                <div class="eq-row" onclick="showItemDetail('head')"><span class="eq-label">🪖 頭部</span><span id="eq-head" class="eq-val q0">(未裝備)</span></div>
+                <div class="eq-row" onclick="showItemDetail('body')"><span class="eq-label">👕 身體</span><span id="eq-body" class="eq-val q0">(未裝備)</span></div>
+                <div class="eq-row" onclick="showItemDetail('acc')"><span class="eq-label">💍 飾品</span><span id="eq-acc" class="eq-val q0">(未裝備)</span></div>
             </div>
-            <div class="eq-row" onclick="showItemDetail('ranged')">
-                <span class="eq-label">🔫 遠程</span><span class="eq-val"><span id="eq-ranged" class="q0">(未裝備)</span> <span id="v-ammo" style="color:#666;font-size:0.8em;font-weight:normal">(0)</span></span>
-                <div id="tag-ranged" class="mastery-tag" style="display:none">專精</div>
-            </div>
-            <div class="eq-row" onclick="showItemDetail('head')"><span class="eq-label">🪖 頭部</span><span id="eq-head" class="eq-val q0">(未裝備)</span></div>
-            <div class="eq-row" onclick="showItemDetail('body')"><span class="eq-label">👕 身體</span><span id="eq-body" class="eq-val q0">(未裝備)</span></div>
-            <div class="eq-row" onclick="showItemDetail('acc')"><span class="eq-label">💍 飾品</span><span id="eq-acc" class="eq-val q0">(未裝備)</span></div>
         </div>
 
     <!-- ★★★敵人專屬區域 ★★★ -->
@@ -60,9 +65,9 @@
         <h1 style="color:var(--r-legend); font-size: 2.5em; text-transform: uppercase; margin-bottom:10px; text-shadow: 0 0 20px rgba(255,170,0,0.5);">末蝕紀元 v50.3</h1>
         <p style="color:#888; margin-bottom: 20px;">正式內容將會大幅更新</p>
         <div style="display:flex; gap:10px;">
-            <button onclick="startGame(1)" style="width:120px;text-align:center">🟢 正常</button>
-            <button onclick="startGame(2)" style="width:120px;text-align:center;border-color:var(--r-rare)">🟡 困難</button>
-            <button onclick="startGame(3)" style="width:120px;text-align:center;border-color:var(--r-legend)">🔴 噩夢</button>
+            <button type="button" onclick="startGame(1)" style="width:120px;text-align:center">🟢 正常</button>
+            <button type="button" onclick="startGame(2)" style="width:120px;text-align:center;border-color:var(--r-rare)">🟡 困難</button>
+            <button type="button" onclick="startGame(3)" style="width:120px;text-align:center;border-color:var(--r-legend)">🔴 噩夢</button>
         </div>
     </div>
 

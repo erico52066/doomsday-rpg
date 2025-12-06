@@ -3237,6 +3237,29 @@ function recycleLoot() {
     if(G.tempLoot.cb) G.tempLoot.cb();
 }
 
+function collapseStat(){
+    const statBar = document.getElementById('stat-bar');
+    const statBtn = document.getElementById('stat-btn');
+    statBar.classList.toggle('collapsed');
+    if (statBar.classList.contains('collapsed')) {
+        statBtn.textContent = '▶️ 現在資訊';
+    } else {
+        statBtn.textContent = '🔽 現在資訊';
+    }
+}
+
+function collapseEquip(){
+    const equipContainer = document.getElementById('equip-container');
+    const equipBtn = document.getElementById('equip-btn');
+    equipContainer.classList.toggle('collapsed');
+
+    if (equipContainer.classList.contains('collapsed')) {
+        equipBtn.textContent = '▶️ 裝備';
+    } else {
+        equipBtn.textContent = '🔽 裝備';
+    }
+}
+
 // Export all functions to window at once
 const globalFunctions = {
     startGame,
@@ -3268,6 +3291,8 @@ const globalFunctions = {
     equipFromBag,
     discardCampItem,
     useCampItem,
+    collapseStat,
+    collapseEquip,
 };
 
 Object.assign(window, globalFunctions);
