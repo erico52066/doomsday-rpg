@@ -625,7 +625,17 @@ function renderStoryModal(showingResult = false) {
         <strong>${storyState.data.title} (${storyState.step+1}/${maxSteps})</strong><br><br>
         ${storyState.step===0 ? storyState.data.intro + '<br><br>' : ''}
         ${stepData.q}
-    </div>`;
+        </div>
+        <div>
+            <span class="stat-lbl">屬性</span>
+            <div id="stat-bar" style="grid-template-columns: repeat(5, 1fr);">
+                <div class="stat-box"><span class="stat-lbl">💪 力量</span><span class="stat-val" >${getStat('s')}</span></div>
+                <div class="stat-box"><span class="stat-lbl">🦵 敏捷</span><span class="stat-val" >${getStat('a')}</span></div>
+                <div class="stat-box"><span class="stat-lbl">🧠 智力</span><span class="stat-val" >${getStat('i')}</span></div>
+                <div class="stat-box"><span class="stat-lbl">🛡️ 意志</span><span class="stat-val" >${getStat('w')}</span></div>
+                <div class="stat-box"><span class="stat-lbl">🍀 幸運</span><span class="stat-val" >${getStat('luck')}</span></div>
+            </div>
+        </div>`;
     
    let shuffledOpts = [...stepData.opts].sort(() => 0.5 - Math.random());
     let btns = '';
@@ -2206,7 +2216,7 @@ function openModal(title, content, btns) {
     document.getElementById('m-btns').innerHTML = btns;
     document.getElementById('screen-modal').style.display = 'flex';
 }
-function closeModal() { document.getElementById('screen-modal').style.display = 'none'; }
+function closeModal() { document.getElementById('screen-modal').style.display = 'none'; showGameContainer();}
 function log(t, m, c='') {
     let d = document.getElementById('log-area');
     d.innerHTML += `<div class="log-entry"><span style="color:#666">[D${G.day}]</span> [${t}] <span class="${c}">${m}</span></div>`;
@@ -2577,6 +2587,7 @@ function rewindTime(daysToRewind, hpCost, statCost) {
     G.playerDefCD = 0;
     
     closeModal();
+    showGameContainer();
     document.getElementById('enemy-area').style.display = 'none';
     document.getElementById('enemy-area').innerHTML = '';
 
@@ -3099,6 +3110,7 @@ const globalFunctions = {
     renderCampActions,
     campPhase,
     nextStoryStep,
+    openCampBag,
 };
 
 Object.assign(window, globalFunctions);
