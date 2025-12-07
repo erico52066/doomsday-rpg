@@ -19,258 +19,257 @@
 	--moral-low: #f44;
 	--luck-color: #ffd700;
 	--xp-color: #b5f;
+}
 
-	/* === 戰鬥介面極度昇華版 === */
+/* === 戰鬥介面極度昇華版 === */
+/* 1. 敵人面板：高科技戰術風格 */
+#enemy-area {
+	background: linear-gradient(180deg, #1a0505 0%, #000 100%);
+	border-bottom: 2px solid #f44;
+	padding: 15px;
+	position: relative;
+	overflow: hidden;
 
-	/* 1. 敵人面板：高科技戰術風格 */
-	#enemy-area {
-		background: linear-gradient(180deg, #1a0505 0%, #000 100%);
-		border-bottom: 2px solid #f44;
-		padding: 15px;
-		position: relative;
-		overflow: hidden;
+	flex-shrink: 0;
+	/* 禁止此區域被壓縮，這能確保它永遠保持完整高度 */
+	z-index: 10;
+	/* 提高層級，確保它壓在日誌文字上方 */
+	box-shadow: 0 5px 20px rgba(0, 0, 0, 0.9);
+	/* 加深陰影，視覺上區隔開來 */
+	min-height: 160px;
+	/* 給予一個最小高度，避免被瞬間擠壓 */
+}
 
-		flex-shrink: 0;
-		/* 禁止此區域被壓縮，這能確保它永遠保持完整高度 */
-		z-index: 10;
-		/* 提高層級，確保它壓在日誌文字上方 */
-		box-shadow: 0 5px 20px rgba(0, 0, 0, 0.9);
-		/* 加深陰影，視覺上區隔開來 */
-		min-height: 160px;
-		/* 給予一個最小高度，避免被瞬間擠壓 */
+/* 敵人頭像區 */
+.enemy-visual {
+	display: flex;
+	justify-content: center;
+	align-items: center;
+	margin-bottom: 10px;
+	height: 80px;
+}
+
+.enemy-avatar {
+	font-size: 4em;
+	filter: drop-shadow(0 0 10px rgba(255, 0, 0, 0.5));
+	animation: float 3s ease-in-out infinite;
+}
+
+/* 敵人數據條 */
+.enemy-hud {
+	display: flex;
+	flex-direction: column;
+	gap: 5px;
+}
+
+.hud-row {
+	display: flex;
+	justify-content: space-between;
+	align-items: center;
+	font-size: 0.9em;
+}
+
+/* 高級血條 */
+.hp-bar-container {
+	height: 16px;
+	background: #300;
+	border: 1px solid #600;
+	border-radius: 8px;
+	position: relative;
+	overflow: hidden;
+	box-shadow: inset 0 0 5px #000;
+}
+
+.hp-bar-fill {
+	height: 100%;
+	background: linear-gradient(90deg, #f22, #a00);
+	width: 100%;
+	transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+	position: relative;
+}
+
+/* 血條光澤特效 */
+.hp-bar-fill::after {
+	content: '';
+	position: absolute;
+	top: 0;
+	left: 0;
+	right: 0;
+	height: 50%;
+	background: rgba(255, 255, 255, 0.2);
+}
+
+/* 狀態圖標 */
+.buff-row {
+	display: flex;
+	gap: 5px;
+	flex-wrap: wrap;
+	justify-content: center;
+	margin-top: 8px;
+}
+
+.buff-badge {
+	background: #222;
+	border: 1px solid #444;
+	padding: 2px 6px;
+	font-size: 0.75em;
+	border-radius: 4px;
+	display: flex;
+	align-items: center;
+	gap: 3px;
+}
+
+/* 動畫特效 */
+@keyframes float {
+
+	0%,
+	100% {
+		transform: translateY(0);
 	}
 
-	/* 敵人頭像區 */
-	.enemy-visual {
-		display: flex;
-		justify-content: center;
-		align-items: center;
-		margin-bottom: 10px;
-		height: 80px;
+	50% {
+		transform: translateY(-10px);
+	}
+}
+
+@keyframes shake {
+	0% {
+		transform: translate(1px, 1px) rotate(0deg);
 	}
 
-	.enemy-avatar {
-		font-size: 4em;
-		filter: drop-shadow(0 0 10px rgba(255, 0, 0, 0.5));
-		animation: float 3s ease-in-out infinite;
+	10% {
+		transform: translate(-1px, -2px) rotate(-1deg);
 	}
 
-	/* 敵人數據條 */
-	.enemy-hud {
-		display: flex;
-		flex-direction: column;
-		gap: 5px;
+	20% {
+		transform: translate(-3px, 0px) rotate(1deg);
 	}
 
-	.hud-row {
-		display: flex;
-		justify-content: space-between;
-		align-items: center;
-		font-size: 0.9em;
+	30% {
+		transform: translate(3px, 2px) rotate(0deg);
 	}
 
-	/* 高級血條 */
-	.hp-bar-container {
-		height: 16px;
-		background: #300;
-		border: 1px solid #600;
-		border-radius: 8px;
-		position: relative;
-		overflow: hidden;
-		box-shadow: inset 0 0 5px #000;
+	40% {
+		transform: translate(1px, -1px) rotate(1deg);
 	}
 
-	.hp-bar-fill {
-		height: 100%;
-		background: linear-gradient(90deg, #f22, #a00);
-		width: 100%;
-		transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-		position: relative;
+	50% {
+		transform: translate(-1px, 2px) rotate(-1deg);
 	}
 
-	/* 血條光澤特效 */
-	.hp-bar-fill::after {
-		content: '';
-		position: absolute;
-		top: 0;
-		left: 0;
-		right: 0;
-		height: 50%;
-		background: rgba(255, 255, 255, 0.2);
+	60% {
+		transform: translate(-3px, 1px) rotate(0deg);
 	}
 
-	/* 狀態圖標 */
-	.buff-row {
-		display: flex;
-		gap: 5px;
-		flex-wrap: wrap;
-		justify-content: center;
-		margin-top: 8px;
+	70% {
+		transform: translate(3px, 1px) rotate(-1deg);
 	}
 
-	.buff-badge {
-		background: #222;
-		border: 1px solid #444;
-		padding: 2px 6px;
-		font-size: 0.75em;
-		border-radius: 4px;
-		display: flex;
-		align-items: center;
-		gap: 3px;
+	80% {
+		transform: translate(-1px, -1px) rotate(1deg);
 	}
 
-	/* 動畫特效 */
-	@keyframes float {
-
-		0%,
-		100% {
-			transform: translateY(0);
-		}
-
-		50% {
-			transform: translateY(-10px);
-		}
+	90% {
+		transform: translate(1px, 2px) rotate(0deg);
 	}
 
-	@keyframes shake {
-		0% {
-			transform: translate(1px, 1px) rotate(0deg);
-		}
+	100% {
+		transform: translate(1px, -2px) rotate(-1deg);
+	}
+}
 
-		10% {
-			transform: translate(-1px, -2px) rotate(-1deg);
-		}
+.shaking {
+	animation: shake 0.5s;
+}
 
-		20% {
-			transform: translate(-3px, 0px) rotate(1deg);
-		}
+.dmg-popup {
+	position: absolute;
+	top: 50%;
+	left: 50%;
+	transform: translate(-50%, -50%);
+	color: #fff;
+	font-weight: bold;
+	font-size: 2em;
+	text-shadow: 0 0 10px #f00;
+	pointer-events: none;
+	animation: popUp 0.8s forwards;
+	z-index: 10;
+}
 
-		30% {
-			transform: translate(3px, 2px) rotate(0deg);
-		}
-
-		40% {
-			transform: translate(1px, -1px) rotate(1deg);
-		}
-
-		50% {
-			transform: translate(-1px, 2px) rotate(-1deg);
-		}
-
-		60% {
-			transform: translate(-3px, 1px) rotate(0deg);
-		}
-
-		70% {
-			transform: translate(3px, 1px) rotate(-1deg);
-		}
-
-		80% {
-			transform: translate(-1px, -1px) rotate(1deg);
-		}
-
-		90% {
-			transform: translate(1px, 2px) rotate(0deg);
-		}
-
-		100% {
-			transform: translate(1px, -2px) rotate(-1deg);
-		}
+@keyframes popUp {
+	0% {
+		opacity: 1;
+		transform: translate(-50%, -50%) scale(0.5);
 	}
 
-	.shaking {
-		animation: shake 0.5s;
+	20% {
+		transform: translate(-50%, -80%) scale(1.5);
 	}
 
-	.dmg-popup {
-		position: absolute;
-		top: 50%;
-		left: 50%;
-		transform: translate(-50%, -50%);
-		color: #fff;
-		font-weight: bold;
-		font-size: 2em;
-		text-shadow: 0 0 10px #f00;
-		pointer-events: none;
-		animation: popUp 0.8s forwards;
-		z-index: 10;
+	100% {
+		opacity: 0;
+		transform: translate(-50%, -150%) scale(1);
 	}
+}
 
-	@keyframes popUp {
-		0% {
-			opacity: 1;
-			transform: translate(-50%, -50%) scale(0.5);
-		}
+/* 戰鬥日誌優化 */
+.log-combat-h {
+	color: #aaa;
+	border-left: 2px solid #555;
+	padding-left: 8px;
+	margin: 4px 0;
+	font-size: 0.9em;
+}
 
-		20% {
-			transform: translate(-50%, -80%) scale(1.5);
-		}
+.log-combat-d {
+	color: #f66;
+	font-weight: bold;
+}
 
-		100% {
-			opacity: 0;
-			transform: translate(-50%, -150%) scale(1);
-		}
-	}
+.log-combat-c {
+	color: #fa0;
+	font-weight: bold;
+	font-size: 1.1em;
+	text-shadow: 0 0 5px #a50;
+}
 
-	/* 戰鬥日誌優化 */
-	.log-combat-h {
-		color: #aaa;
-		border-left: 2px solid #555;
-		padding-left: 8px;
-		margin: 4px 0;
-		font-size: 0.9em;
-	}
+.log-combat-p {
+	color: #4f4;
+}
 
-	.log-combat-d {
-		color: #f66;
-		font-weight: bold;
-	}
+/* === 物品分類標籤樣式 === */
+.type-tag {
+	display: inline-block;
+	font-size: 0.75em;
+	padding: 1px 5px;
+	border-radius: 3px;
+	margin-right: 6px;
+	font-weight: normal;
+	vertical-align: middle;
+	border: 1px solid #444;
+	background: #222;
+	color: #aaa;
+}
 
-	.log-combat-c {
-		color: #fa0;
-		font-weight: bold;
-		font-size: 1.1em;
-		text-shadow: 0 0 5px #a50;
-	}
+/* 不同類型的微調顏色 (可選) */
+.tag-melee {
+	color: #f88;
+	border-color: #633;
+}
 
-	.log-combat-p {
-		color: #4f4;
-	}
+.tag-ranged {
+	color: #8f8;
+	border-color: #363;
+}
 
-	/* === 物品分類標籤樣式 === */
-	.type-tag {
-		display: inline-block;
-		font-size: 0.75em;
-		padding: 1px 5px;
-		border-radius: 3px;
-		margin-right: 6px;
-		font-weight: normal;
-		vertical-align: middle;
-		border: 1px solid #444;
-		background: #222;
-		color: #aaa;
-	}
+.tag-def {
+	color: #88f;
+	border-color: #336;
+}
 
-	/* 不同類型的微調顏色 (可選) */
-	.tag-melee {
-		color: #f88;
-		border-color: #633;
-	}
-
-	.tag-ranged {
-		color: #8f8;
-		border-color: #363;
-	}
-
-	.tag-def {
-		color: #88f;
-		border-color: #336;
-	}
-
-	.tag-con {
-		color: #fa0;
-		border-color: #640;
-	}
+.tag-con {
+	color: #fa0;
+	border-color: #640;
 }
 
 body {
@@ -283,7 +282,7 @@ body {
 	justify-content: center;
 	height: 100%;
 	overflow: hidden;
-    -webkit-user-select: none;
+	-webkit-user-select: none;
 	user-select: none;
 }
 
@@ -300,9 +299,10 @@ body {
 	position: relative;
 
 	/* ★★★ 確保高度限制，讓內部滾動生效 ★★★ */
-    height: calc(100dvh - 10px); 
+	height: calc(100dvh - 10px);
 	/* 佔滿視窗高度 */
-    max-height: calc(100dvh - 10px); /* include padding */
+	max-height: calc(100dvh - 10px);
+	/* include padding */
 	overflow: hidden;
 	/* 禁止整個遊戲框出現滾動條 */
 }
@@ -317,8 +317,8 @@ body {
 }
 
 #stat-btn {
-    width: 100%;
-    padding: 6px;
+	width: 100%;
+	padding: 6px;
 }
 
 #stat-bar {
@@ -328,26 +328,27 @@ body {
 	gap: 4px;
 	text-align: center;
 	padding: 8px;
-     /* Animation properties */
-    max-height: 200px;
-    overflow: hidden;
-    opacity: 1;
-    transform: scaleY(1);
-    transform-origin: top;
-    transition: max-height 0.4s cubic-bezier(0.4, 0, 0.2, 1),
-                opacity 0.3s ease,
-                transform 0.4s cubic-bezier(0.4, 0, 0.2, 1),
-                padding 0.3s ease,
-                margin 0.3s ease;
+	/* Animation properties */
+	max-height: 200px;
+	overflow: hidden;
+	opacity: 1;
+	transform: scaleY(1);
+	transform-origin: top;
+	transition: max-height 0.4s cubic-bezier(0.4, 0, 0.2, 1),
+		opacity 0.3s ease,
+		transform 0.4s cubic-bezier(0.4, 0, 0.2, 1),
+		padding 0.3s ease,
+		margin 0.3s ease;
 }
 
 #stat-bar.collapsed {
-    max-height: 0;
-    opacity: 0;
-    transform: scaleY(0);
-    padding: 0;
-    margin: 0;
-    pointer-events: none; /* Prevent clicking on hidden content */
+	max-height: 0;
+	opacity: 0;
+	transform: scaleY(0);
+	padding: 0;
+	margin: 0;
+	pointer-events: none;
+	/* Prevent clicking on hidden content */
 }
 
 #weather-bar {
@@ -392,8 +393,8 @@ body {
 }
 
 #equip-btn {
-    width: 100%;
-    padding: 6px;
+	width: 100%;
+	padding: 6px;
 }
 
 #equip-container {
@@ -404,26 +405,26 @@ body {
 	grid-template-columns: 1fr 1fr 1fr;
 	gap: 8px;
 
-     /* Animation properties */
-    max-height: 300px;
-    overflow: hidden;
-    opacity: 1;
-    transform: scaleY(1);
-    transform-origin: top;
-    transition: max-height 0.4s cubic-bezier(0.4, 0, 0.2, 1),
-                opacity 0.3s ease,
-                transform 0.4s cubic-bezier(0.4, 0, 0.2, 1),
-                padding 0.3s ease,
-                margin 0.3s ease;
+	/* Animation properties */
+	max-height: 300px;
+	overflow: hidden;
+	opacity: 1;
+	transform: scaleY(1);
+	transform-origin: top;
+	transition: max-height 0.4s cubic-bezier(0.4, 0, 0.2, 1),
+		opacity 0.3s ease,
+		transform 0.4s cubic-bezier(0.4, 0, 0.2, 1),
+		padding 0.3s ease,
+		margin 0.3s ease;
 }
 
 #equip-container.collapsed {
-    max-height: 0;
-    opacity: 0;
-    transform: scaleY(0);
-    padding: 0;
-    margin: 0;
-    pointer-events: none;
+	max-height: 0;
+	opacity: 0;
+	transform: scaleY(0);
+	padding: 0;
+	margin: 0;
+	pointer-events: none;
 }
 
 .eq-row {
@@ -529,7 +530,7 @@ body {
 	flex-direction: column;
 	gap: 8px;
 	min-height: 280px;
-  flex-shrink: 0;
+	flex-shrink: 0;
 }
 
 .btn-grid {
@@ -780,20 +781,22 @@ button:disabled {
 }
 
 /* 手機裝置提示樣式 */
-@media (pointer: coarse), (hover: none) {
-  [title] {
-    position: relative;
-    display: inline-flex;
-    justify-content: center;
-  }
-  [title]:focus::after {
-    content: attr(title);
-    position: absolute;
-    top: 90%;
-    color: #000;
-    background-color: #fff;
-    border: 1px solid;
-    width: fit-content;
-    padding: 3px;
-  }
+@media (pointer: coarse),
+(hover: none) {
+	[title] {
+		position: relative;
+		display: inline-flex;
+		justify-content: center;
+	}
+
+	[title]:focus::after {
+		content: attr(title);
+		position: absolute;
+		top: 90%;
+		color: #000;
+		background-color: #fff;
+		border: 1px solid;
+		width: fit-content;
+		padding: 3px;
+	}
 }

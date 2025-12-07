@@ -1520,7 +1520,7 @@ function getEnemyAvatar(name) {
 }
 
 // 2. 戰鬥描述生成器 (Flavor Text)
-function getCombatFlavor(attacker, target, action, dmg, isCrit, isKill) {
+function getCombatFlavor(attacker, target, dmg, isCrit, isKill) {
     // 閃避描述
     if (dmg === 0) {
         const dodgeTexts = [
@@ -1571,11 +1571,22 @@ function triggerShake() {
         // 飄字效果
         let damage = G.lastDmg || 0;
         if (damage > 0) {
+            // Get enemy position
+             const rect = el.getBoundingClientRect();
             let popup = document.createElement('div');
             popup.className = 'dmg-popup';
             popup.innerHTML = `-${damage}`;
             if(G.lastCrit) popup.style.color = '#ff0';
-            el.appendChild(popup);
+
+            // Position at enemy center using fixed positioning
+            popup.style.position = 'fixed';
+            popup.style.left = (rect.left + rect.width / 2) + 'px';
+            popup.style.top = (rect.top + rect.height / 2) + 'px';
+            popup.style.transform = 'translate(-50%, -50%)';
+            popup.style.zIndex = '10000';
+            
+            // // Add to BODY not enemy-area
+            document.body.appendChild(popup);
             setTimeout(() => popup.remove(), 1000);
         }
     }
@@ -1824,6 +1835,7 @@ function combatRound(act) {
             isCrit = true;
             logMsg.push("🔥 暴擊！");
         }
+        G.lastCrit = isCrit;
 
         // 技能/被動加成
         if (c.buffs.hedgeTurns > 0) { dmg += c.buffs.hedgeAtk; logMsg.push(`(對沖基金 +${c.buffs.hedgeAtk})`); c.buffs.hedgeTurns--; }
@@ -2148,7 +2160,7 @@ function combatRound(act) {
             let flavor = getCombatFlavor('你', c.n, act, realDmg, isCrit, false);
             logMsg.push(`<div class="log-combat-h">${flavor}</div>`);
 
-            G.lastDmg = realDmg;
+            G.lastDmg = realDmg;            
             triggerShake();
         }
     }
@@ -2299,7 +2311,7 @@ function processEnemyTurn(c, logMsg) {
                 if(G.job.passive === 'block_chance' && Math.random()<0.2) { eDmg = Math.floor(eDmg*0.5); logMsg.push("鐵壁格擋"); }
                 if(c.buffs.dance === 'Hozin' && Math.random()<0.2) { eDmg=0; logMsg.push("Hozin格擋"); }
 
-		if (G.job.trait === '抑鬱霸王' && G.flags.depression) {
+                if (G.job.trait === '抑鬱霸王' && G.flags.depression) {
                     take = Math.floor(take * 0.5);
                     logMsg.push("(太抑鬱了, 我變得連敵人的傷害也不再在乎.)");
                 }
@@ -2352,9 +2364,9 @@ function processEnemyTurn(c, logMsg) {
                     }
                 } 
             } else if (isDodged) {
-        let flavor = getCombatFlavor('你', c.n, act, 0, false, false);
-        logMsg.push(`<div class="log-combat-h">${flavor}</div>`);
-    }
+                let flavor = getCombatFlavor('你', c.n, 0, false, false);
+                logMsg.push(`<div class="log-combat-h">${flavor}</div>`);
+            }
         }
     }
     checkCombatEnd(c, logMsg);
@@ -3369,6 +3381,17 @@ function collapseEquip(){
     }
 }
 
+function debugCheat(){
+    G.money += 99999;
+    G.food = 99999;
+    G.water = 99999;
+    G.maxHp += 99999;
+    G.hp = G.maxHp;
+    G.san = 100;
+    updateUI();
+    log('系統', '作弊成功！獲得 $99999，99999食物, 99999水源, 99999 HP, 並恢復狀態。', 'c-epic');
+}
+
 // Export all functions to window at once
 const globalFunctions = {
     startGame,
@@ -3408,6 +3431,8 @@ const globalFunctions = {
     openCampBag,
     renderJobs,
     renderJobIntro,
+    debugCheat,
+    triggerShake,
 };
 
 Object.assign(window, globalFunctions);
