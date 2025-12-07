@@ -842,7 +842,7 @@ function storyChoose(type, statKey, isBoss, bossName, isQuest) {
         scoreChange = 2;
         let reward = getEventReward();
         resultText = `<span class="c-epic">大成功！</span><br>${reward}<br>(全屬性微升)`;
-        let s=['s','a','i','w'][Math.floor(Math.random()*4)]; G.stats[s]++;
+        ['s','a','i','w'].forEach(s=>G.stats[s]++);
         gainXp(1); 
         G.money += 30;
         resultText += " (獲得 $30)";
@@ -1714,6 +1714,7 @@ function renderCombat() {
     }
 
     document.getElementById('action-area').innerHTML = statsBar + actionButtonsHtml;
+    updateUI();
 }
 // ==================== 戰鬥邏輯核心 (完整修復版) ====================
 
@@ -3164,9 +3165,8 @@ function getItemValue(item) {
 function openShop() {
     // 每日首次打開判定黑市 (2%)
     if (G.shop.lastDay !== G.day) {
-        G.shop.lastDay = G.day;
         // 每週自動刷新商品 (或者第一天)
-        if (G.day % 7 === 0 || G.shop.items.length === 0) {
+        if (Math.floor(G.day / 7) != Math.floor(G.shop.lastDay / 7) || G.shop.items.length === 0) {
             refreshShopItems(false); // 每週刷新重置為普通商店
         }
         
@@ -3177,6 +3177,7 @@ function openShop() {
         }
     }
     renderShopModal();
+    G.shop.lastDay = G.day;
 }
 
 function activateBlackMarket() {
