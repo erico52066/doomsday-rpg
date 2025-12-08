@@ -30,5 +30,5 @@
     "welding": {"n":"全身焊接", "cd":3, "desc":"敵命中降50%降防"},
     "raptor": {"n":"速龍突襲", "cd":3, "desc":"200%傷, 機率直接逮捕"},
     "redbull": {"n":"Red Bull BC ONE", "cd":4, "desc":"攻閃+30%"},
-    "high_pitch": {"n":"飆高音", "cd":3, "desc":"受傷但降敵攻命"}
+    "high_pitch": {"n":"飆高音", "cd":3, "desc":"高音擊穿敵人耳膜, 下降攻擊力命中率!"}
 }
