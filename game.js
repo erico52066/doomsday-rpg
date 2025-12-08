@@ -16,6 +16,7 @@ import QUEST_DB from './data/QUEST_DB.json' with  { type: "json" };
 import LOCATIONS from './data/LOCATIONS.json' with  { type: "json" };
 import LOC_EVENT_DB from './data/LOC_EVENT_DB.json' with { type: "json" };
 import AFFIX_DB from './data/AFFIX_DB.json' with { type: "json" };
+import AFFIX_DB from './data/BOSS_LOOT_DB.json' with { type: "json" };
 
 // ==================== 怪物資料庫擴充 ====================
 import ENEMY_PREFIXES from './data/ENEMY_PREFIXES.json' with { type: "json" };
@@ -778,6 +779,41 @@ function startEpicStory() {
     renderStoryModal();
 }
 
+// 新增：計算事件選項的成功率 (回傳 0-100 的數字)
+function getEventSuccessRate(type, statKey) {
+    // 基礎機率：Good(穩妥選項)=66%, Bad(冒險選項)=24%
+    let pSuccess = type === 'good' ? 66 : 24;
+    
+    // 1. 屬性修正
+    let statVal = getStat(statKey);
+    // 難度隨天數增加 (係數需與 calculateOutcome 保持一致)
+    let difficulty = 10 + (G.day * 0.2); 
+    
+    // 每一點屬性差提供 0.5% 加成，上限 +/- 20%
+    let statMod = (statVal - difficulty) * 0.5; 
+    statMod = Math.max(-20, Math.min(20, statMod)); 
+
+    // 2. 幸運修正
+    let luckMod = (getStat('luck') - 10) * 0.5;
+    luckMod = Math.max(-10, Math.min(10, luckMod));
+
+    // 3. 道德修正 (善選項受高道德加成，惡選項受低道德加成)
+    let moralMod = 0;
+    if(type === 'good') { 
+        if(G.moral > 50) moralMod = (G.moral - 50) * 0.2; 
+    } else { 
+        if(G.moral < 50) moralMod = (50 - G.moral) * 0.2; 
+    }
+    
+    // 最終成功率
+    let finalRate = pSuccess + statMod + luckMod + moralMod;
+    
+    // 馮狗 (休班警) 被動修正：成功率稍微降低但獎勵高 (這裡只反映顯示機率)
+    if(G.job.passive === 'bad_cop') finalRate -= 10;
+
+    return Math.floor(Math.max(5, Math.min(95, finalRate)));
+}
+
 function renderStoryModal(showingResult = false) {
     let maxSteps = storyState.type=='epic' ? 5 : 1;
     if(storyState.step >= maxSteps) { finishStory(); return; }
@@ -794,25 +830,49 @@ function renderStoryModal(showingResult = false) {
         ${storyState.step===0 ? storyState.data.intro + '<br><br>' : ''}
         ${stepData.q}
         </div>
-        <div>
-            <span class="stat-lbl">屬性</span>
-            <div id="stat-bar" style="grid-template-columns: repeat(5, 1fr);">
-                <div class="stat-box"><span class="stat-lbl">💪 力量</span><span class="stat-val" >${getStat('s')}</span></div>
-                <div class="stat-box"><span class="stat-lbl">🦵 敏捷</span><span class="stat-val" >${getStat('a')}</span></div>
-                <div class="stat-box"><span class="stat-lbl">🧠 智力</span><span class="stat-val" >${getStat('i')}</span></div>
-                <div class="stat-box"><span class="stat-lbl">🛡️ 意志</span><span class="stat-val" >${getStat('w')}</span></div>
-                <div class="stat-box"><span class="stat-lbl">🍀 幸運</span><span class="stat-val" >${getStat('luck')}</span></div>
-            </div>
+        
+        <!-- 顯示當前屬性供參考 -->
+        <div style="margin-bottom:10px; font-size:0.85em; color:#888; display:flex; gap:10px; justify-content:center;">
+            <span>💪 ${getStat('s')}</span>
+            <span>🦵 ${getStat('a')}</span>
+            <span>🧠 ${getStat('i')}</span>
+            <span>🛡️ ${getStat('w')}</span>
+            <span>🍀 ${getStat('luck')}</span>
         </div>`;
     
-   let shuffledOpts = [...stepData.opts].sort(() => 0.5 - Math.random());
+    let shuffledOpts = [...stepData.opts].sort(() => 0.5 - Math.random());
     let btns = '';
+    
+    // 定義屬性圖標映射
+    const STAT_ICON = { 's':'💪', 'a':'🦵', 'i':'🧠', 'w':'🛡️', 'luck':'🍀' };
+
     shuffledOpts.forEach(opt => {
-        // 修改這裡：根據是否是 Boss 選項傳遞不同參數
+        // 1. Boss 戰選項
         if (opt.boss) {
-             btns += `<button class="opt-btn" onclick="storyChoose('${opt.type}', 'luck', true, '${opt.bossName}', ${opt.isQuest})">➤ ${opt.t}</button>`;
-        } else {
-             btns += `<button class="opt-btn" onclick="storyChoose('${opt.type}', '${opt.stat||'luck'}', false)">➤ ${opt.t}</button>`;
+             btns += `<button class="opt-btn" style="border-left-color:#f44" onclick="storyChoose('${opt.type}', 'luck', true, '${opt.bossName}', ${opt.isQuest})">
+                <div style="font-weight:bold; color:#f44">💀 BOSS戰</div>
+                <div>${opt.t}</div>
+             </button>`;
+        } 
+        // 2. 普通判定選項
+        else {
+             let statKey = opt.stat || 'luck';
+             let icon = STAT_ICON[statKey] || '❓';
+             let chance = getEventSuccessRate(opt.type, statKey);
+             
+             // 根據機率決定顏色
+             let rateColor = chance >= 70 ? '#4f4' : (chance >= 40 ? '#fa0' : '#f44');
+             let borderStyle = `border-left: 4px solid ${rateColor}`;
+
+             btns += `<button class="opt-btn" style="${borderStyle}" onclick="storyChoose('${opt.type}', '${statKey}', false)">
+                <div style="display:flex; justify-content:space-between; width:100%">
+                    <span>${icon} ${opt.t}</span>
+                    <span style="color:${rateColor}; font-weight:bold">${chance}%</span>
+                </div>
+                <div style="font-size:0.75em; color:#666; text-align:left; margin-top:2px">
+                    檢定: ${STAT_MAP[statKey] || statKey}
+                </div>
+             </button>`;
         }
     });
     openModal(storyState.data.title, html, btns);
@@ -884,32 +944,22 @@ function storyChoose(type, statKey, isBoss, bossName, isQuest) {
 }
 
 function calculateOutcome(type, statKey) {
+    // 1. 獲取成功率 (這與按鈕上顯示的數值一致)
+    let successRate = getEventSuccessRate(type, statKey);
+    
+    // 2. 擲骰子 (0 ~ 99)
     let roll = Math.random() * 100;
     
-    let pCritS = 5;
-    let pSuccess = type === 'good' ? 66 : 24;
+    // 3. 判定邏輯
+    // 大成功機率固定為 5% (加上幸運修正)
+    let critChance = 5 + (getStat('luck') > 15 ? 5 : 0);
     
-    let statVal = getStat(statKey);
-    let difficulty = 10 + (G.day * 0.2); 
-    let statMod = (statVal - difficulty) * 0.5; 
-    statMod = Math.max(-10, Math.min(10, statMod)); 
-
-    let luckMod = (getStat('luck') - 10) * 0.5;
-    luckMod = Math.max(-5, Math.min(5, luckMod));
-
-    let moralMod = 0;
-    if(type === 'good') { if(G.moral > 50) moralMod = (G.moral - 50) * 0.2; } 
-    else { if(G.moral < 50) moralMod = (50 - G.moral) * 0.2; }
+    // 檢定
+    if (roll < critChance) return 'crit_success'; // 大成功
+    if (roll < successRate) return 'success';     // 成功
+    if (roll > 95) return 'crit_fail';            // 大失敗 (固定 5% 機率)
     
-    let threshCritS = pCritS + (luckMod > 0 ? 1 : 0);
-    let effectiveSuccessRate = pSuccess + statMod + luckMod + moralMod;
-    let threshSuccess = threshCritS + effectiveSuccessRate;
-    let threshFail = 95; 
-
-    if (roll < threshCritS) return 'crit_success';
-    if (roll < threshSuccess) return 'success';
-    if (roll < threshFail) return 'fail';
-    return 'crit_fail';
+    return 'fail'; // 失敗
 }
 
 function nextStoryStep() { storyState.step++; renderStoryModal(false); }
@@ -923,10 +973,10 @@ function finishStory() {
 
         // 定義地點的預設獎勵類型
         const LOC_REWARDS = {
-            "廢棄超市": "🍖food", "民居": "🍖food", "下水道": "random",
+            "廢棄超市": "food", "民居": "food", "下水道": "random",
             "五金店": "melee", "健身房": "melee",
             "警局分局": "ranged", "服裝店": "body",
-            "診所": "💊med", "公園": "💧water",
+            "診所": "med", "公園": "water",
             "銀行": "acc", "電子城": "acc", "學校": "acc"
         };
 
@@ -1356,7 +1406,7 @@ function abandonQuest() {
 
 // ==================== 戰鬥與物品 ====================
 function triggerBossFight(name, isQuest=false) { 
-    // 使用動態計算，類型為 boss 或 final_boss
+    // ★★★ 使用動態計算 (新代碼) ★★★
     let typeKey = (name === "最終屍王") ? 'final_boss' : 'boss';
     let stats = getDynamicEnemyStats(typeKey);
 
@@ -1366,7 +1416,7 @@ function triggerBossFight(name, isQuest=false) {
 
     if (name === "最終屍王") {
         bossDodge = 50; 
-        // 最終Boss給予額外的壓力係數 (確保真的很難)
+        // 最終Boss給予額外的壓力係數
         hp = Math.floor(hp * 1.2);
         atk = Math.floor(atk * 1.1);
     }
@@ -1396,104 +1446,10 @@ function triggerBossFight(name, isQuest=false) {
     
     log('遭遇', `強敵出現：${name} (HP:${hp}, ATK:${atk})`, 'c-loss');
     
-    // 顯示敵人區域
     let eArea = document.getElementById('enemy-area');
     if (eArea) eArea.style.display = 'block';
     
     renderCombat();
-}
-
-// ==================== 全新動態難度平衡系統 ====================
-
-// 1. 計算玩家當前戰力與期望值
-function getPlayerCombatPower() {
-    // A. 計算玩家最佳輸出 (考慮暴擊期望值)
-    let s = getStat('s'), a = getStat('a');
-    let meleeRaw = getEquipVal(G.eq.melee) + s;
-    let rangedRaw = getEquipVal(G.eq.ranged) + a;
-    let baseAtk = Math.max(meleeRaw, rangedRaw);
-    
-    // 暴擊期望修正：Atk * (1 + (暴率% * (暴傷倍率-1)))
-    // 假設暴傷為 150% (1.5) -> 多出來的 0.5
-    let derived = calcDerivedStats();
-    let critChance = Math.min(100, derived.crit) / 100;
-    let expAtk = baseAtk * (1 + (critChance * 0.5));
-
-    // B. 計算玩家防禦與減傷
-    let def = getEquipVal(G.eq.head) + getEquipVal(G.eq.body);
-    // 獲取減傷百分比 (0.0 ~ 0.8)
-    let reducPct = Math.min(80, derived.dmgRed) / 100; 
-
-    return { 
-        atk: Math.max(5, Math.floor(expAtk)), 
-        def: def, 
-        hp: G.maxHp, 
-        reduc: reducPct 
-    };
-}
-
-// 2. 核心：根據類型生成動態數值
-function getDynamicEnemyStats(type) {
-    let p = getPlayerCombatPower();
-    let diff = G.diff; // 1=Normal, 2=Hard, 3=Nightmare
-
-    // --- 設定戰鬥節奏目標 (回合數) ---
-    // TTK_Player: 玩家殺死怪需要幾回合
-    // TTK_Enemy:  怪殺死玩家需要幾回合
-    let target = { playerTurns: 3, enemyTurns: 12 }; // 預設普通怪
-
-    if (type === 'elite') {
-        target.playerTurns = 6;
-        target.enemyTurns = 8;
-    } else if (type === 'boss') {
-        target.playerTurns = 12;
-        target.enemyTurns = 5; // Boss 5回合就能殺死玩家，迫使玩家回血/控場
-    } else if (type === 'final_boss') {
-        target.playerTurns = 18;
-        target.enemyTurns = 4; // 最終Boss極限壓制
-    }
-
-    // --- 難度修正係數 ---
-    let hpMult = 1.0;
-    let atkMult = 1.0;
-
-    if (diff === 2) { // 困難
-        hpMult = 1.2;
-        atkMult = 1.15;
-    } else if (diff === 3) { // 噩夢
-        hpMult = 1.5;
-        atkMult = 1.3;
-    }
-
-    // --- A. 計算敵人 HP ---
-    // EnemyHP = 玩家每回合傷害 * 目標回合 * 難度血量倍率
-    let eHP = Math.floor(p.atk * target.playerTurns * hpMult);
-
-    // --- B. 計算敵人 ATK ---
-    // 邏輯：(EnemyAtk - PlayerDef) * (1 - Reduc) = (PlayerHP / EnemyTurns)
-    // 逆推：EnemyAtk = [ (PlayerHP / EnemyTurns) / (1 - Reduc) ] + PlayerDef
-    // 這樣保證怪物打在玩家身上的「淨傷害」，正好能在 EnemyTurns 回合殺死玩家
-    
-    let requiredNetDmg = p.hp / target.enemyTurns;
-    // 避免除以0
-    let effectiveReduc = Math.max(0.1, 1 - p.reduc); 
-    let rawDmgNeeded = requiredNetDmg / effectiveReduc;
-    
-    let eAtk = Math.floor((rawDmgNeeded + p.def) * atkMult);
-
-    // --- C. 天數保底 (防止脫裝備騙數值) ---
-    // 隨著天數增加，怪物的「最低消費」會提升
-    let dayScale = 1 + (G.day * 0.1); // 每10天 +100% 基礎
-    let minHP = 30 * dayScale;
-    let minAtk = 10 + (G.day * 0.5);
-
-    if (type === 'boss' || type === 'elite') { minHP *= 3; minAtk *= 1.5; }
-    if (type === 'final_boss') { minHP = 8000; minAtk = 200; } // 最終Boss硬性下限
-
-    eHP = Math.max(eHP, Math.floor(minHP));
-    eAtk = Math.max(eAtk, Math.floor(minAtk));
-
-    return { hp: eHP, atk: eAtk };
 }
 
 // ==================== 替換原有的 triggerCombat ====================
@@ -1505,7 +1461,7 @@ function triggerCombat(enemyTemplate, danger) {
     let isElite = false;
     let isBoss = false;
 
-    // 1. 決定敵人模板 (名字與特性)
+    // 1. 決定敵人模板
     if (enemyTemplate) {
         enemy = enemyTemplate;
     } else {
@@ -1515,7 +1471,6 @@ function triggerCombat(enemyTemplate, danger) {
         let spawnTier = tier;
         if(safeDanger >= 4 && Math.random() < 0.3) spawnTier = Math.min(5, tier + 1);
 
-        // 嘗試生成地點 Boss
         if (Math.random() < bossChance && LOCATION_BOSSES && LOCATION_BOSSES[locationName]) {
             let bosses = LOCATION_BOSSES[locationName];
             if (bosses) {
@@ -1524,7 +1479,6 @@ function triggerCombat(enemyTemplate, danger) {
             }
         } 
         
-        // 嘗試生成精英
         if (!enemy && Math.random() < eliteChance) {
             let pool = ELITE_ENEMIES[spawnTier];
             if (!pool || pool.length === 0) pool = ELITE_ENEMIES[1];
@@ -1534,29 +1488,27 @@ function triggerCombat(enemyTemplate, danger) {
             }
         } 
         
-        // 生成普通怪
         if (!enemy) {
             let pool = NORMAL_ENEMIES[spawnTier];
             if (!pool || pool.length === 0) pool = NORMAL_ENEMIES[1];
-            if (!pool || pool.length === 0) enemy = { n: "迷路的喪屍", hp: 30, atk: 5 }; // Fallback
+            if (!pool || pool.length === 0) enemy = { n: "迷路的喪屍", hp: 30, atk: 5 };
             else enemy = pool[Math.floor(Math.random() * pool.length)];
         }
     }
     
-    // 複製模板
     enemy = JSON.parse(JSON.stringify(enemy));
 
-    // 2. 應用動態數值平衡 (覆蓋原有的固定數值)
+    // ★★★ 2. 應用動態數值平衡 (新代碼) ★★★
     let typeKey = isBoss ? 'boss' : (isElite ? 'elite' : 'normal');
     let stats = getDynamicEnemyStats(typeKey);
     
-    // 危險度修正：高危區域稍微再強一點點 (5% per danger level)
+    // 危險度修正
     let dangerMult = 1 + ((danger || 1) - 1) * 0.05;
     
     let hp = Math.floor(stats.hp * dangerMult);
     let atk = Math.floor(stats.atk * dangerMult);
 
-    // 3. 詞綴生成 (保持不變)
+    // 3. 詞綴生成
     let prefixData = null;
     let prefixChance = 0.1 + (G.day / 120); 
     if (isElite || isBoss) prefixChance += 0.3;
@@ -1571,8 +1523,6 @@ function triggerCombat(enemyTemplate, danger) {
         if (pool) {
             prefixData = pool[Math.floor(Math.random() * pool.length)];
             enemy.n = `${prefixData.n}${enemy.n}`;
-            
-            // 詞綴數值修正 (乘算)
             hp = Math.floor(hp * (prefixData.hp || 1));
             atk = Math.floor(atk * (prefixData.atk || 1));
             
@@ -1595,7 +1545,7 @@ function triggerCombat(enemyTemplate, danger) {
     G.activeSkillCD = 0;
     G.playerDefCD = 0;
 
-    // 5. 初始化 Combat 對象
+    // 5. 初始化 Combat
     G.combat = { 
         n: enemy.n, 
         maxHp: hp, 
@@ -2109,6 +2059,14 @@ function combatRound(act) {
         let baseAvg = (getDmgEst('melee') + getDmgEst('ranged')) / 2;
         let derived = calcDerivedStats();
 
+// 輔助函數：計算屬性變化
+        const getStatDiff = (statName) => {
+            let oldVal = getStat(statName);
+            // 這裡我們無法簡單回滾狀態再計算，所以採用顯示"當前值與Buff說明"的方式
+            // 或者直接根據Buff邏輯計算預期增幅
+            return oldVal; 
+        };
+
         // --- 完整技能列表 ---
         if (sk === 'kid_squad') {
             c.buffs.kidClones = 5; 
@@ -2198,19 +2156,27 @@ function combatRound(act) {
             else if(r < 0.75) { c.buffs.atkDown = 3; logMsg.push("【人之初】：嘮叨說教，敵人攻擊力下降"); } 
             else { c.buffs.atkDown=2; c.buffs.defDown=2; logMsg.push("【性本善】：精神污染，敵人攻防同時下降"); }
         } 
-        else if(sk === 'dlss') {
+    else if(sk === 'dlss') {
+            // ★★★ 優化顯示：DLSS ★★★
             c.buffs.dlss = 3;
-            logMsg.push("DLSS 開啟：敏捷與閃避大幅提升！");
-        } 
+            let boostA = Math.floor(getStat('a') * 0.5); // DLSS 增加 50%
+            logMsg.push(`DLSS 開啟：敏捷大幅提升 <span style="color:#4f4">(+${boostA})</span>！`);
+        }    
         else if(sk === 'bullseye') {
             dmg = baseAvg * 1 * dScale; 
             c.buffs.ignoreDef = 1; 
             if(Math.random()*100 < derived.crit) dmg *= (derived.critDmg/100);
             logMsg.push("紅心鎖定：無視防禦的一擊！");
         } 
-        else if(sk === 'creatine') {
+      else if(sk === 'creatine') {
+            // ★★★ 優化顯示：肌酸 ★★★
             c.buffs.allUp = 2;
-            logMsg.push("喝下肌酸：全屬性爆發提升！");
+            // 肌酸全屬性增加 50%
+            let boostS = Math.floor(getStat('s') * 0.5);
+            let boostA = Math.floor(getStat('a') * 0.5);
+            let boostI = Math.floor(getStat('i') * 0.5);
+            let boostW = Math.floor(getStat('w') * 0.5);
+            logMsg.push(`喝下肌酸：全屬性爆發提升！<br><span style="font-size:0.8em;color:#4f4">(力+${boostS} 敏+${boostA} 智+${boostI} 意+${boostW})</span>`);
         } 
         else if(sk === 'hypnosis') {
             c.buffs.sleep = 2;
@@ -2252,9 +2218,10 @@ function combatRound(act) {
             c.buffs.drift = 5;
             logMsg.push("東京漂移：進入連擊狀態！");
         } 
-        else if(sk === 'matrix') {
+       else if(sk === 'matrix') {
+            // ★★★ 優化顯示：Matrix ★★★
             c.buffs.matrix = 3;
-            logMsg.push("Matrix：看穿代碼，閃避極限提升！");
+            logMsg.push("Matrix：看穿代碼，閃避極限提升 <span style='color:#4f4'>(+50%)</span>！");
         } 
         else if(sk === 'one_cue') {
             if(c.isBoss) {
@@ -2307,8 +2274,11 @@ function combatRound(act) {
             }
         } 
         else if(sk === 'redbull') {
+            // ★★★ 優化顯示：RedBull ★★★
             c.buffs.redbull = 3;
-            logMsg.push("Red Bull：送你一對翼！閃避與攻擊提升");
+            // 30% 提升
+            let boostA = Math.floor(getStat('a') * 0.3);
+            logMsg.push(`Red Bull：送你一對翼！閃避與攻擊提升 <span style="color:#4f4">(敏+${boostA})</span>`);
         } 
         else if(sk === 'high_pitch') {
             // === 平衡修正：消耗大幅降低至 2 (避免戰鬥後餓死) ===
@@ -2793,7 +2763,6 @@ function processEnemyTurn(c, logMsg) {
         if(c.buffs.dodgeUp > 0) c.buffs.dodgeUp--;
         }
     }
-    checkCombatEnd(c, logMsg);
 }
 
 function checkCombatEnd(c, logMsg) {
@@ -2803,12 +2772,31 @@ function checkCombatEnd(c, logMsg) {
         log('戰鬥', '勝利！', 'c-gain'); 
         gainXp(c.xpVal || 1); 
 
-	// ★★★ 修改處：將最後的戰鬥記錄暫存起來，供 Loot 畫面顯示 ★★★
-        G.lastCombatLog = logMsg; 	
+        G.lastCombatLog = logMsg;   
 
-        if(c.isBoss && c.n==="最終屍王") gameOver("通關！");
-        else if(c.isQuest) { completeQuest(); return; }
-        else { let t=['melee','ranged','head','body','acc'][Math.floor(Math.random()*5)]; showLootModal(createItem(t,'random',1), t, campPhase); }
+        if(c.isBoss && c.n==="最終屍王") {
+            gameOver("通關！");
+        }
+        // ★★★ 修改：Boss 戰勝利邏輯 ★★★
+        else if(c.isBoss) { 
+            // 1. 生成 Diablo 式掉落列表
+            let loot = generateBossLoot(c.n, c.isQuest);
+            
+            // 2. 顯示新視窗
+            showBossLootWindow(loot, () => {
+                if(c.isQuest) {
+                    completeQuest(); // 任務 Boss 撿完東西後，結算任務
+                } else {
+                    campPhase(); // 地點 Boss 撿完直接回營地
+                }
+            });
+        }
+        // 普通怪/精英怪 保持原有邏輯 (或也可以改用簡化版列表)
+        else { 
+            let t=['melee','ranged','head','body','acc','med','throwable'][Math.floor(Math.random()*7)];
+            if(t==='med'||t==='throwable') t = (Math.random()<0.5)?'med':'throwable';
+            showLootModal(createItem(t,'random',0), t, campPhase);
+        }
     } else {
         c.usedItem = false; 
         renderCombat();
@@ -3971,6 +3959,232 @@ function debugCheat(){
     log('系統', '作弊成功！獲得 $99999，99999食物, 99999水源, 99999 HP, 並恢復狀態。', 'c-epic');
 }
 
+
+
+// ==================== 全新動態難度平衡系統 (請貼在文件末尾) ====================
+
+// 1. 計算玩家當前戰力與期望值
+function getPlayerCombatPower() {
+    // A. 計算玩家最佳輸出 (考慮暴擊期望值)
+    let s = getStat('s'), a = getStat('a');
+    let meleeRaw = getEquipVal(G.eq.melee) + s;
+    let rangedRaw = getEquipVal(G.eq.ranged) + a;
+    let baseAtk = Math.max(meleeRaw, rangedRaw);
+    
+    // 暴擊期望修正
+    let derived = calcDerivedStats();
+    let critChance = Math.min(100, derived.crit) / 100;
+    let expAtk = baseAtk * (1 + (critChance * 0.5));
+
+    // B. 計算玩家防禦與減傷
+    let def = getEquipVal(G.eq.head) + getEquipVal(G.eq.body);
+    let reducPct = Math.min(80, derived.dmgRed) / 100; 
+
+    return { 
+        atk: Math.max(5, Math.floor(expAtk)), 
+        def: def, 
+        hp: G.maxHp, 
+        reduc: reducPct 
+    };
+}
+
+// 2. 核心：根據類型生成動態數值 (v2.0 優化版)
+function getDynamicEnemyStats(type) {
+    let p = getPlayerCombatPower();
+    let diff = G.diff; 
+
+    // 隨機波動 0.8 ~ 1.2
+    let variance = 0.8 + Math.random() * 0.4; 
+
+    // 設定目標節奏
+    let target = { playerTurns: 2.2, enemyTurns: 10 }; 
+
+    if (type === 'elite') {
+        target.playerTurns = 6;
+        target.enemyTurns = 7;
+    } else if (type === 'boss') {
+        target.playerTurns = 12;
+        target.enemyTurns = 4.5;
+    } else if (type === 'final_boss') {
+        target.playerTurns = 18;
+        target.enemyTurns = 3.5;
+        variance = 1.0; 
+    }
+
+    let hpMult = 1.0;
+    let atkMult = 1.0;
+
+    if (diff === 2) { hpMult = 1.25; atkMult = 1.2; }
+    else if (diff === 3) { hpMult = 1.6; atkMult = 1.4; }
+
+    // 成長係數衰減 (讓玩家感覺變強)
+    let scalingFactor = 0.85; 
+    let adjustedAtk = p.atk * scalingFactor;
+    adjustedAtk += (G.day * 2); 
+
+    let eHP = Math.floor(adjustedAtk * target.playerTurns * hpMult * variance);
+
+    let requiredNetDmg = p.hp / target.enemyTurns;
+    let effectiveReduc = Math.max(0.1, 1 - p.reduc); 
+    let rawDmgNeeded = requiredNetDmg / effectiveReduc;
+    
+    let eAtk = Math.floor((rawDmgNeeded + p.def) * atkMult * variance);
+
+    // 天數保底
+    let dayScale = 1 + (G.day * 0.12); 
+    let minHP = 35 * dayScale;
+    let minAtk = 8 + (G.day * 0.6);
+
+    if (type === 'boss' || type === 'elite') { minHP *= 4; minAtk *= 1.5; }
+    if (type === 'final_boss') { minHP = 10000; minAtk = 250; } 
+
+    eHP = Math.max(eHP, Math.floor(minHP));
+    eAtk = Math.max(eAtk, Math.floor(minAtk));
+
+    return { hp: eHP, atk: eAtk };
+}
+
+    function generateBossLoot(bossName, isQuest) {
+    let lootList = [];
+    
+    // 1. 必掉：大量金錢 (Diablo的金幣堆)
+    let moneyAmt = 50 + Math.floor(Math.random() * 100) + (G.day * 2);
+    if (G.diff === 3) moneyAmt = Math.floor(moneyAmt * 0.6);
+    lootList.push({ type: 'money', val: moneyAmt, fullName: `💰 金幣堆 ($${moneyAmt})`, rarity: 1, desc:"亮閃閃的" });
+
+    // 2. 必掉：消耗品 (藥水/食物)
+    let itemType = ['med', 'food', 'water', 'throwable'][Math.floor(Math.random()*4)];
+    let tier = getCurrentTier();
+    let commonItem = createItem(itemType, 'random', tier);
+    commonItem.fullName = `${commonItem.fullName} (掉落)`;
+    lootList.push(commonItem);
+
+    // 3. 機率掉落：隨機高級裝備 (填充物)
+    // 掉落 1-2 件隨機 T+1 裝備
+    let randomCount = 1 + Math.floor(Math.random() * 2);
+    for(let i=0; i<randomCount; i++) {
+        let type = ['melee','ranged','head','body','acc','shoes'][Math.floor(Math.random()*6)];
+        // 有機會掉落高一階的裝備
+        let lootTier = (Math.random() < 0.3) ? Math.min(5, tier + 1) : tier;
+        let item = createItem(type, 'random', lootTier);
+        // 強制提升稀有度
+        item.rarity = Math.max(item.rarity, 1); 
+        if(Math.random() < 0.2) item.rarity = 2; // 紫裝
+        item.fullName = `📦 ${item.fullName}`;
+        lootList.push(item);
+    }
+
+    // 4. 核心：專屬裝備判定 (Exclusive Drops)
+    let exclusives = BOSS_LOOT_DB[bossName];
+    if (exclusives) {
+        exclusives.forEach(ex => {
+            // 任務 Boss 套裝每個部位 30% 機率
+            // 地點 Boss 單件紅裝 40% 機率 (如果只有一件)
+            let dropChance = isQuest ? 0.35 : 0.4; 
+            
+            // 幸運加成：每 10 點幸運 + 5% 掉落率
+            dropChance += (getStat('luck') * 0.005);
+
+            if (Math.random() < dropChance) {
+                // 建構物品物件
+                let drop = {
+                    name: ex.n,
+                    fullName: `🔥 [專屬] ${ex.n}`,
+                    type: ex.type,
+                    val: ex.val,
+                    tier: Math.max(3, tier), // 專屬至少 T3
+                    rarity: ex.rarity,
+                    stats: ex.stats || {},
+                    fx: ex.fx || null,
+                    isJobNative: false,
+                    uid: Math.random()
+                };
+                // 如果是遠程，補彈藥
+                if(drop.type === 'ranged') drop.ammo = ex.ammo || 20;
+                
+                lootList.push(drop);
+            }
+        });
+    }
+
+    return lootList;
+}
+
+function showBossLootWindow(lootList, callback) {
+    // 構建 HTML
+    let html = `<div style="text-align:left; max-height:60vh; overflow-y:auto;">
+        <div style="text-align:center; color:#ffd700; margin-bottom:10px; font-size:1.2em; font-weight:bold;">
+            ✨ Boss 擊殺獎勵 ✨
+        </div>
+        <div style="display:grid; gap:8px;">`;
+
+    lootList.forEach((item, idx) => {
+        let tag = item.type === 'money' ? '💰' : getItemTypeTag(item.type);
+        let valInfo = item.type === 'money' ? '' : `${getItemValueLabel(item.type)}: ${getEquipVal(item)}`;
+        let bg = item.rarity === 3 ? 'background:linear-gradient(90deg, #310, #520)' : 'background:#222';
+        
+        // 物品按鈕
+        html += `<div id="loot-row-${idx}" style="${bg}; padding:8px; border:1px solid #444; display:flex; justify-content:space-between; align-items:center;">
+            <div>
+                <div class="q${item.rarity}" style="font-weight:bold; font-size:0.95em;">${tag} ${item.fullName}</div>
+                <div style="font-size:0.8em; color:#aaa;">${valInfo} ${item.stats && item.stats.desc ? item.stats.desc : ''}</div>
+                ${item.fx ? `<div style="font-size:0.75em; color:#d0f;">特效: ${item.fx.desc}</div>` : ''}
+            </div>
+            ${item.type !== 'money' 
+                ? `<button onclick="pickUpBossLoot(${idx})" style="width:auto; padding:4px 10px; font-size:0.8em;">拾取</button>`
+                : `<span style="color:#ffd700; font-size:0.8em;">已自動拾取</span>`
+            }
+        </div>`;
+    });
+
+    html += `</div></div>`;
+    
+    // 將 lootList 存入全局變數以便拾取函數使用
+    window.currentBossLoot = lootList;
+    window.bossLootCallback = callback;
+
+    openModal("戰利品", html, `<button onclick="closeBossLoot()">離開 (丟棄剩餘)</button>`);
+    
+    // 自動拾取金錢
+    lootList.forEach(item => {
+        if(item.type === 'money') G.money += item.val;
+    });
+    updateUI();
+}
+
+// 單個拾取邏輯
+function pickUpBossLoot(idx) {
+    let item = window.currentBossLoot[idx];
+    if(!item) return;
+
+    if(G.bag.length >= getBagCapacity()) {
+        alert("背包已滿！請先整理背包或丟棄其他物品。");
+        // 這裡可以做更高級的：打開背包整理視窗，但為了避免UI疊加過於複雜，暫時用 alert
+        return;
+    }
+
+    G.bag.push(item);
+    log('拾取', `獲得 ${item.fullName}`, 'c-gain');
+    
+    // 視覺更新：隱藏該行或變灰
+    let row = document.getElementById(`loot-row-${idx}`);
+    if(row) {
+        row.style.opacity = '0.3';
+        row.innerHTML = `<div style="color:#4f4; width:100%; text-align:center;">已放入背包</div>`;
+        row.onclick = null;
+    }
+    
+    // 從清單中移除（標記為 null 防止重複）
+    window.currentBossLoot[idx] = null;
+    updateUI();
+}
+
+function closeBossLoot() {
+    closeModal();
+    if(window.bossLootCallback) window.bossLootCallback();
+}
+
+
 // Export all functions to window at once
 const globalFunctions = {
     startGame,
@@ -4012,6 +4226,8 @@ const globalFunctions = {
     renderJobIntro,
     debugCheat,
     triggerShake,
+    pickUpBossLoot, 
+    closeBossLoot, 
 };
 
 Object.assign(window, globalFunctions);
