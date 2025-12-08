@@ -16,7 +16,8 @@ import QUEST_DB from './data/QUEST_DB.json' with  { type: "json" };
 import LOCATIONS from './data/LOCATIONS.json' with  { type: "json" };
 import LOC_EVENT_DB from './data/LOC_EVENT_DB.json' with { type: "json" };
 import AFFIX_DB from './data/AFFIX_DB.json' with { type: "json" };
-import AFFIX_DB from './data/BOSS_LOOT_DB.json' with { type: "json" };
+import BOSS_LOOT_DB from './data/BOSS_LOOT_DB.json' with { type: "json" };
+import SKILL_DB from './data/SKILL_DB.json' with { type: "json" };
 
 // ==================== 怪物資料庫擴充 ====================
 import ENEMY_PREFIXES from './data/ENEMY_PREFIXES.json' with { type: "json" };
@@ -328,6 +329,7 @@ function finishSetup(m) {
         if(['s','a','i','w'].includes(k)) G.stats[k] += m.bonus[k];
         if(k==='luck') G.luck += m.bonus.luck;
         if(k==='moral') G.moral += m.bonus.moral;
+    
     }
 
     let g = G.job.g; // g[0]=melee name, g[1]=ranged name...
@@ -344,6 +346,15 @@ function finishSetup(m) {
     if(G.diff===2) { G.food=80; G.water=80; }
     if(G.diff===3) { G.food=50; G.water=50; G.hp=80; }
     
+    // =========== ★★★ 請在這裡插入代碼 ★★★ ===========
+    G.unlockedSkills = [];
+    
+    // 初始化技能：如果職業有 skill_tree，解鎖第一招
+    if (G.job.skill_tree && G.job.skill_tree.length > 0) {
+        G.unlockedSkills.push(G.job.skill_tree[0]);
+    }
+    // =================================================
+
     document.getElementById('screen-mbti').style.display = 'none';
     
     recalcMaxHp(); 
@@ -397,11 +408,40 @@ function campPhase() {
     if(G.day >= 197) return triggerBossFight("最終屍王"); 
 
     G.day++;
-    
-    // --- 修改處：移除 G.activeSkillCD 的相關代碼 ---
-    // G.activeSkillCD = Math.max(0, G.activeSkillCD - 1); (已刪除)
     G.playerDefCD = Math.max(0, G.playerDefCD - 1); // 防禦CD如果是回合制也可移走，這裡暫時保留或視需求改動
     
+    // =========== ★★★ 請在這裡插入代碼 ★★★ ===========
+    // === 新增：30天頓悟系統 ===
+    // 檢查條件：有技能樹、天數大於0、且是30的倍數
+    if (G.job.skill_tree && G.day > 0 && G.day % 30 === 18) {
+        let skillIndex = Math.ceil(G.day / 30); 
+        
+        // 確保索引在範圍內
+        if (skillIndex < G.job.skill_tree.length) {
+            let newSkillId = G.job.skill_tree[skillIndex];
+            
+            // 避免重複添加 (如果存檔系統未來加入，這很重要)
+            if (!G.unlockedSkills.includes(newSkillId)) {
+                G.unlockedSkills.push(newSkillId);
+                
+                // 從 DB 獲取技能資料以顯示名稱
+                // 注意：這裡需要確保 SKILL_DB 已被 import
+                let sData = SKILL_DB[newSkillId] || { n: "未知技能", desc: "力量在體內湧動..." };
+                
+                // 使用 setTimeout 稍微延遲彈窗，確保 UI 刷新後才顯示
+                setTimeout(() => {
+                    openModal("✨ 頓悟時刻", 
+                        `<div style="color:#ffd700; font-size:1.2em; margin-bottom:10px; font-weight:bold;">領悟新技能：${sData.n}</div>
+                         <div style="color:#ccc; border-left:2px solid #ffd700; padding-left:10px; margin-bottom:10px;">${sData.desc}</div>
+                         <div style="font-size:0.9em; color:#888;">(已自動加入戰鬥技能列表)</div>`, 
+                        `<button onclick="closeModal()">豁然開朗</button>`
+                    );
+                }, 500); 
+            }
+        }
+    }
+    // =================================================
+
     if(G.job.trait==='抑鬱霸王') {
         let depressChance = 0.3 - ((G.moral - 50) * 0.005); // 50道德=30%, 100道德=5%
         G.flags.depression = (Math.random() < Math.max(0.05, depressChance));
@@ -1050,7 +1090,8 @@ function finishStory() {
 
 function calcDerivedStats() {
     let s = getStat('s'), a = getStat('a'), i = getStat('i'), w = getStat('w'), l = getStat('luck');
-    
+    let sanState = getSanityState(); // ★★★ 獲取精神狀態 ★★★
+
     // 1. 基礎閃避
     let dodgeBase = a * 0.4; 
 
@@ -1072,8 +1113,10 @@ function calcDerivedStats() {
     // 遍歷所有裝備部位，如果有提供 dodge 屬性，就加上去
     for(let k in G.eq) if(G.eq[k]?.stats?.dodge) dodgeBase += G.eq[k].stats.dodge;
     // =======================================================
+// ★★★ 5. SAN 值修正 (閃避) ★★★
+    if(sanState.buffs.dodge) dodgeBase += sanState.buffs.dodge;
 
-    // 5. 最終上限判定 (Hard Cap 70%)
+    // 6. 最終上限判定 (Hard Cap 70%)
      let maxDodge = G.job.passive === 'high_dodge' ? 85 : 70;
     let finalDodge = Math.floor(dodgeBase);
     if (finalDodge > maxDodge) finalDodge = maxDodge;
@@ -1085,6 +1128,11 @@ function calcDerivedStats() {
     if(G.combat?.buffs?.dance === 'Hoan') critBase += 20;
     for(let k in G.eq) if(G.eq[k]?.stats?.crit) critBase += G.eq[k].stats.crit;
 
+
+    // ★★★ SAN 值修正 (暴擊) ★★★
+    if(sanState.buffs.crit) critBase += sanState.buffs.crit;
+
+    // --- 減傷計算 ---
     let dmgRed = w * 0.25; 
     for(let k in G.eq) {
         if(G.eq[k] && G.eq[k].stats && G.eq[k].stats.defP) {
@@ -1094,6 +1142,13 @@ function calcDerivedStats() {
         }
     }
     if(G.combat?.buffs?.dance === 'Pete') dmgRed += 10;
+
+    // ★★★ SAN 值修正 (防禦/減傷) ★★★
+    if(sanState.buffs.defP) dmgRed += (sanState.buffs.defP * 100);
+
+    // ★★★ 修復：確保回傳命中與攻擊加成，避免 NaN ★★★
+    let sanAccBonus = sanState.buffs.acc || 0;     // 來自 SAN 的命中加成
+    let sanAtkBonus = sanState.buffs.atkPct || 0;  // 來自 SAN 的攻擊百分比
 
     return {
         dodge: Math.min(75, Math.max(0, finalDodge)), 
@@ -1318,7 +1373,13 @@ function doScavenge(t, d) {
         dmg = Math.max(1, dmg - reduce);
 
         G.hp -= dmg;
-        log('搜刮', `觸發陷阱 (-${dmg} HP)`, 'c-loss'); 
+        // ★★★ 新增：陷阱驚嚇扣除 SAN ★★★
+        // 危險度越高，扣得越多 (Danger 1 = -2, Danger 5 = -10)
+        let scare = Math.floor(d * 2);
+        G.san -= scare;
+        
+        log('搜刮', `觸發陷阱！受到傷害 (-${dmg} HP) 並受到驚嚇 (<span style="color:var(--san-color)">-${scare} SAN</span>)`, 'c-loss'); 
+        // ==============================
         
         // --- 修改開始：失敗保底 ---
         // 即使失敗，也能找到一點點垃圾食物 (5-10點)
@@ -1414,6 +1475,19 @@ function triggerBossFight(name, isQuest=false) {
     let atk = stats.atk;
     let bossDodge = (getCurrentTier() - 1) * 10 + 5; 
 
+    // ★★★ 新增：Boss 開場威壓 ★★★
+    let terror = 10; // 基礎扣 10
+    if (name === "最終屍王") terror = 20; // 屍王扣 20
+    if (G.diff === 3) terror = Math.floor(terror * 1.5); // 噩夢加成
+
+    // 意志力(Will) 可以抵消部分恐懼
+    let willMitigation = Math.floor(getStat('w') * 0.5);
+    terror = Math.max(1, terror - willMitigation);
+
+    G.san -= terror;
+    log('遭遇', `強敵的壓迫感讓你呼吸困難！ <span style="color:var(--san-color)">SAN -${terror}</span>`, 'c-loss');
+    // ============================
+
     if (name === "最終屍王") {
         bossDodge = 50; 
         // 最終Boss給予額外的壓力係數
@@ -1425,7 +1499,8 @@ function triggerBossFight(name, isQuest=false) {
     G.playerDefCD = 0;
 
     G.combat = { 
-        n:name, 
+        n:name,
+        baseName: name, 
         maxHp:hp, 
         hp:hp, 
         atk:atk, 
@@ -1497,6 +1572,7 @@ function triggerCombat(enemyTemplate, danger) {
     }
     
     enemy = JSON.parse(JSON.stringify(enemy));
+    let originalName = enemy.n; 
 
     // ★★★ 2. 應用動態數值平衡 (新代碼) ★★★
     let typeKey = isBoss ? 'boss' : (isElite ? 'elite' : 'normal');
@@ -1548,6 +1624,7 @@ function triggerCombat(enemyTemplate, danger) {
     // 5. 初始化 Combat
     G.combat = { 
         n: enemy.n, 
+        baseName: originalName,
         maxHp: hp, 
         hp: hp, 
         atk: atk, 
@@ -1582,6 +1659,20 @@ function triggerCombat(enemyTemplate, danger) {
 
     renderCombat();
 }
+
+// ★★★ 新增：Boss 裝備開場特效 ★★★
+    // 1. 小丑面具 (fear_aura)：敵人開場機率膽怯(降攻)
+    if (G.eq.head && G.eq.head.fx && G.eq.head.fx.t === 'fear_aura') {
+        if (Math.random() < 0.5) {
+            G.combat.buffs.atkDown = 3;
+            log('裝備', `🤡 小丑面具發動：${G.combat.n} 感到恐懼 (攻擊下降)`);
+        }
+    }
+    // 2. 洗腦廣播 (hypnosis)：開場催眠
+    if (G.eq.acc && G.eq.acc.fx && G.eq.acc.fx.t === 'hypnosis') {
+        G.combat.buffs.sleep = 3;
+        log('裝備', `📻 洗腦廣播發動：${G.combat.n} 陷入深層睡眠`);
+    }
 
 // ==================== 修正後的戰鬥渲染 (修復變數未定義錯誤) ====================
 // === 戰鬥視覺輔助函數 ===
@@ -1773,25 +1864,55 @@ function renderCombat() {
         ${skillHtml}
     </div>`;
 
-    // === 2. 渲染玩家與操作區域 (下方) ===
-    let skillData = SKILLS[G.job.sk];
-    if(!skillData) skillData = {n:'無技能', desc:'', cd:99};
+   // === 2. 渲染玩家與操作區域 (下方) ===
     
-    // 安全讀取 Debuffs
+    // 安全讀取 Debuffs (先定義這個，因為按鈕狀態需要用到)
     let safeDebuffs = c.playerDebuffs || {};
     let isSilenced = safeDebuffs.silence > 0;
+
+    // ★★★ 新增：判斷使用新系統還是舊系統 ★★★
+    let skillBtnHtml = "";
     
-    let skillBtnText = `<div style="font-weight:bold">${skillData.n}</div>`;
-    if(isSilenced) skillBtnText += `<div style="font-size:0.75em;color:#d0f">⛔沉默(${safeDebuffs.silence})</div>`;
-    else if(G.activeSkillCD > 0) skillBtnText += `<div style="font-size:0.75em;color:#f44">CD:${G.activeSkillCD}</div>`;
-    else skillBtnText += `<div style="font-size:0.75em;color:#4f4">就緒</div>`;
+    if (G.job.skill_tree) {
+        // --- 新系統：顯示「技能選單」按鈕 ---
+        let cdCount = 0;
+        if (G.combat.skillCDs) {
+            for (let k in G.combat.skillCDs) {
+                if (G.combat.skillCDs[k] > 0) cdCount++;
+            }
+        }
+        
+        let btnText = `<div style="font-weight:bold">⚡ 技能 (${G.unlockedSkills.length})</div>`;
+        
+        if (isSilenced) {
+            btnText += `<div style="font-size:0.75em;color:#d0f">⛔沉默(${safeDebuffs.silence})</div>`;
+        } else if (cdCount > 0) {
+            btnText += `<div style="font-size:0.75em;color:#fa0">${cdCount}招冷卻中</div>`;
+        } else {
+            btnText += `<div style="font-size:0.75em;color:#4f4">就緒</div>`;
+        }
+        
+        skillBtnHtml = `<button onclick="openSkillMenu()" ${isSilenced?'disabled':''}>${btnText}</button>`;
+        
+    } else {
+        // --- 舊系統：保留原有邏輯 (兼容舊職業) ---
+        let skillData = SKILLS[G.job.sk];
+        if(!skillData) skillData = {n:'無技能', desc:'', cd:99};
+        
+        let btnLabel = `<div style="font-weight:bold">${skillData.n}</div>`;
+        if(isSilenced) btnLabel += `<div style="font-size:0.75em;color:#d0f">⛔沉默(${safeDebuffs.silence})</div>`;
+        else if(G.activeSkillCD > 0) btnLabel += `<div style="font-size:0.75em;color:#f44">CD:${G.activeSkillCD}</div>`;
+        else btnLabel += `<div style="font-size:0.75em;color:#4f4">就緒</div>`;
+        
+        skillBtnHtml = `<button title="${skillData.desc}" onclick="combatRound('skill')" ${(G.activeSkillCD>0 || isSilenced)?'disabled':''}>${btnLabel}</button>`;
+    }
+    // ==========================================
 
     let pStun = safeDebuffs.stun > 0;
     
     let pStatus = [];
     if(pStun) pStatus.push(`<span class="buff-badge" style="color:#fa0;border-color:#fa0">⚡暈眩(${safeDebuffs.stun})</span>`);
     if(c.playerShield > 0) pStatus.push(`<span class="buff-badge" style="color:#4f4;border-color:#4f4">🛡️盾${c.playerShield}</span>`);
-
     // --- ★★★ 新增：玩家血條計算 ★★★ ---
     let playerHpPercent = Math.max(0, Math.min(100, (G.hp / G.maxHp) * 100));
     // 使用綠色漸變代表玩家 (區別於敵人的紅色)
@@ -1842,7 +1963,10 @@ function renderCombat() {
         <div class="combat-grid">
             <button onclick="combatRound('melee')">⚔️ 近戰<br><small style="color:#888">預估: ${getDmgEst('melee')}</small></button>
             <button onclick="combatRound('ranged')" ${G.ammo>0?'':'disabled'}>🔫 射擊 (${G.ammo})<br><small style="color:#888">預估: ${getDmgEst('ranged')}</small></button>
-            <button title="${skillData.desc}" onclick="combatRound('skill')" ${(G.activeSkillCD>0 || isSilenced)?'disabled':''}>${skillBtnText}</button>
+            
+            <!-- ★★★ 這裡插入剛剛生成的技能按鈕變數 ★★★ -->
+            ${skillBtnHtml}
+            
             <button onclick="combatRound('defend')" ${G.playerDefCD>0?'disabled':''} style="border-color:#55aaff">🛡️ 防禦 (CD:${G.playerDefCD})</button>
             <button class="combat-full-width" onclick="openCombatBag()" ${c.usedItem?'disabled style="opacity:0.5"':''}>🎒 戰鬥物品 (${G.bag.length})</button>
             <button class="combat-full-width" onclick="combatRound('flee')">🏃 逃跑</button>
@@ -1882,6 +2006,31 @@ function combatRound(act) {
     c.turnCount++;
     G.isDefending = (act === 'defend'); // 標記防禦狀態
 
+    // =========== ★★★ 請在這裡插入代碼 ★★★ ===========
+    // 新技能系統 CD 遞減
+    if (c.skillCDs) {
+        for (let k in c.skillCDs) {
+            if (c.skillCDs[k] > 0) c.skillCDs[k]--;
+        }
+    }
+    // =================================================
+
+    // ★★★ 新增：SAN值過低導致的幻覺檢查 ★★★
+    let sanState = getSanityState();
+    if (sanState.state === 'madness' && act !== 'flee' && act !== 'defend') {
+        // 只有攻擊/技能會受幻覺影響，逃跑和防禦是本能，不受影響
+        if (Math.random() < sanState.buffs.hallucination) {
+            logMsg.push(`<span style="color:#d0f; font-weight:bold;">😵 精神崩潰！你因為幻覺對著空氣揮舞了一回合...</span>`);
+            // 跳過玩家行動，直接進入敵人回合 (如果有)
+            // 這裡我們直接 return false 讓敵人行動，但不執行 doPlayerMove
+            
+            // 敵人回合
+            processEnemyTurn(c, logMsg);
+            return; // 結束本回合
+        }
+    }
+    // ==========================================
+
     if (act !== 'skill' && G.activeSkillCD > 0) G.activeSkillCD--;
     if (act !== 'defend' && G.playerDefCD > 0) G.playerDefCD--;
     if (c.playerDebuffs.silence > 0) c.playerDebuffs.silence--;
@@ -1900,13 +2049,21 @@ function combatRound(act) {
     }
 
     // === 定義玩家行動函數 (為了可以調換順序) ===
-    const doPlayerMove = () => {
-        // 暈眩檢查
+ const doPlayerMove = () => {
+        // ★★★ 修復 1：處理「跳過回合」按鈕 ★★★
+        if (act === 'skip') {
+             if (c.playerDebuffs.stun > 0) c.playerDebuffs.stun--;
+             logMsg.push(`<span style="color:#aaa">跳過回合...</span>`);
+             return true; // 結束玩家行動
+        }
+        
+        // ★★★ 修復 2：防止暈眩時點其他按鈕 ★★★
         if (c.playerDebuffs.stun > 0) {
             logMsg.push(`<span style="color:#fa0">你處於暈眩狀態，無法行動！(剩餘 ${c.playerDebuffs.stun})</span>`);
-            c.playerDebuffs.stun--;
-            return;
+            // 這裡不扣除 stun 回合，因為要等玩家點擊 skip 才能扣
+            return true; // 阻止行動
         }
+        // ... (後續代碼保持不變)
 
     // === 2. 被動效果 ===
     if (G.job.passive === 'pills' && Math.random() < 0.33) {
@@ -1940,6 +2097,7 @@ function combatRound(act) {
         logMsg.push(`諾貝爾獎: ${STAT_MAP[stat]}提升`);
     }
 
+    let derived = calcDerivedStats(); // 重新獲取 (包含 SAN 加成)
     // === 3. 玩家行動結算 ===
     let dmg = 0;
 
@@ -1958,9 +2116,18 @@ function combatRound(act) {
         if(G.job.passive === 'weapon_break' && Math.random() < 0.015) {
             logMsg.push("糟糕！武器承受不住你的中二之力而損壞了！"); 
         }
-
+        
         // --- ★★★ Lil Kid 連擊邏輯 ★★★ ---
         let baseDmg = getDmgEst(act);
+
+       // ★★★ 新增：瘋狂狀態攻擊力加成 ★★★
+        if (derived.sanAtkBonus > 0) {
+            let bonus = Math.floor(baseDmg * derived.sanAtkBonus);
+            baseDmg += bonus;
+            // 這裡不 push log，以免訊息太多，數值會直接反映在傷害上
+        }
+        // ==============================
+
         let hits = 1; 
         
         if (c.buffs.kidClones > 0) {
@@ -1973,10 +2140,13 @@ function combatRound(act) {
         dmg = baseDmg * hits;
         // ---------------------------------
 
+        // 量子計算晶片 (auto_aim)：必定命中且暴擊
+    let autoAim = (G.eq.acc && G.eq.acc.fx && G.eq.acc.fx.t === 'auto_aim');
         // 暴擊判定
-        let derived = calcDerivedStats();
+        derived = calcDerivedStats();
         let isCrit = false;
-        if ((Math.random() * 100 < derived.crit) || (c.buffs.sleep > 0)) {
+         // 修改暴擊判定
+    if (autoAim || (Math.random() * 100 < derived.crit) || (c.buffs.sleep > 0)) {
             dmg = Math.floor(dmg * (derived.critDmg / 100));
             isCrit = true;
             logMsg.push("🔥 暴擊！");
@@ -2030,8 +2200,13 @@ function combatRound(act) {
         if (c.buffs.sleep || c.isStunned || c.buffs.root) enemyDodge = 0;
 
         let myAcc = getStat('a') * 0.5;
+        // ★★★ 新增：冷靜狀態命中加成 / 瘋狂狀態命中懲罰 ★★★
+        if (derived.sanAccBonus) {
+            myAcc += derived.sanAccBonus;
+        }
+        // ==============================
         let finalDodge = Math.max(0, enemyDodge - myAcc);
-        let ignoreDodge = (c.buffs.ignoreDef > 0) || (c.buffs.matrix > 0);
+        let ignoreDodge = autoAim || (c.buffs.ignoreDef > 0) || (c.buffs.matrix > 0);
 
         if (!ignoreDodge && Math.random() * 100 < finalDodge) {
             dmg = 0;
@@ -2169,15 +2344,17 @@ function combatRound(act) {
             logMsg.push("紅心鎖定：無視防禦的一擊！");
         } 
       else if(sk === 'creatine') {
-            // ★★★ 優化顯示：肌酸 ★★★
-            c.buffs.allUp = 2;
+
             // 肌酸全屬性增加 50%
             let boostS = Math.floor(getStat('s') * 0.5);
             let boostA = Math.floor(getStat('a') * 0.5);
             let boostI = Math.floor(getStat('i') * 0.5);
             let boostW = Math.floor(getStat('w') * 0.5);
             logMsg.push(`喝下肌酸：全屬性爆發提升！<br><span style="font-size:0.8em;color:#4f4">(力+${boostS} 敏+${boostA} 智+${boostI} 意+${boostW})</span>`);
-        } 
+            
+            // 最後才應用 Buff
+            c.buffs.allUp = 2;
+      }
         else if(sk === 'hypnosis') {
             c.buffs.sleep = 2;
             logMsg.push("催眠術：敵人陷入睡眠 (下次受傷必定暴擊)");
@@ -2435,11 +2612,34 @@ function combatRound(act) {
         processEnemyTurn(c, logMsg); // 敵人行動
     }
 
+     // ★★★ 修復 3：確保被擊暈後強制更新畫面 ★★★
+    if (c.playerDebuffs && c.playerDebuffs.stun > 0) {
+        log('戰鬥', logMsg.join(' ')); // 先輸出戰鬥紀錄
+        log('系統', '你被擊暈了！', 'c-loss');
+        updateUI();
+        renderCombat(); // 強制重繪，顯示「跳過」按鈕
+        return; // 暫停，等待玩家點擊跳過
+    }
+    // ==========================================
+
     checkCombatEnd(c, logMsg);
 }
 
 // 提取敵人回合邏輯，避免函數過長和嵌套錯誤
 function processEnemyTurn(c, logMsg) {
+    
+    // ★★★ 裝備免疫判定 ★★★
+    // 冠軍腰帶 (grit)：免疫所有負面
+    let isImmuneAll = (G.eq.body && G.eq.body.fx && G.eq.body.fx.t === 'grit');
+    
+    // 暴君頭盔 (stun_res)：免疫暈眩
+    let isImmuneStun = isImmuneAll || (G.eq.head && G.eq.head.fx && G.eq.head.fx.t === 'stun_res');
+    
+    if (isImmuneStun && (c.playerDebuffs.stun > 0)) {
+        c.playerDebuffs.stun = 0;
+        log('裝備', `🛡️ 裝備免疫了暈眩效果！`);
+    }
+
     // --- 5. 敵人狀態結算 (DoT) ---
     if(c.hp > 0) {
 
@@ -2507,50 +2707,108 @@ function processEnemyTurn(c, logMsg) {
                 
                 // 只有「異常狀態類」效果可以被抵抗，直接傷害類(aoe/crit)不可抵抗
                 // 特殊：san_dmg (精神傷害) 也可以被意志抵抗
+
+                // ★★★ 新增：解析技能效果是否帶有 SAN 傷害 ★★★
+                let effectType = skill.eff;
+                let hasSanDmg = false;
+
+                // 如果效果名稱包含 "_san" (例如 "crit_san")
+                if (effectType.includes("_san")) {
+                    hasSanDmg = true;
+                    // 移除後綴，還原為基礎效果 (例如 "crit")，讓後面的邏輯繼續處理物理部分
+                    effectType = effectType.replace("_san", "");
+                }
+
+                // 處理 SAN 傷害部分
+                if (hasSanDmg) {
+                    if (isResisted) {
+                        logMsg.push("<span style='color:#4f4'>抵抗了精神衝擊！</span>");
+                    } else {
+                        // 混合技能的 SAN 傷害適中 (10-15)
+                        let drain = 10 + (G.diff * 2);
+                        G.san -= drain;
+                        logMsg.push(`<span style='color:#a0f'>精神受損 SAN -${drain}</span>`);
+                    }
+                }
                 
-                if (skill.eff === 'stun') { 
+                // ★★★ 處理純精神攻擊 (新增的第3招) ★★★
+                if (skill.eff === 'san_dmg') { 
+                    // 原有的 san_dmg 邏輯
+                    if(isResisted) logMsg.push("<span style='color:#4f4'>堅定的意志抵擋了精神污染！</span>");
+                    else { 
+                        let drain = 15 + (G.diff * 5); // 傷害加強
+                        G.san -= drain; 
+                        logMsg.push(`<span style='color:#a0f'>精神受損 SAN -${drain}</span>`); 
+                    }
+                }
+                else if (skill.eff === 'san_heavy') { 
+                    if(isResisted) { G.san -= 15; logMsg.push(`<span style='color:#4f4'>意志減輕了精神重創 (SAN -15)</span>`); }
+                    else { 
+                        let drain = 40 + (G.diff * 10);
+                        G.san -= drain; 
+                        logMsg.push(`<strong style='color:#a0f'>精神崩潰！ SAN -${drain}</strong>`); 
+                    }
+                }
+                else if (skill.eff === 'san_half') { 
+                    if(isResisted) { G.san -= Math.floor(G.san * 0.2); logMsg.push("抵抗了理智斷線。"); }
+                    else { 
+                        let drain = Math.floor(G.san * 0.5);
+                        G.san -= drain; 
+                        logMsg.push(`<strong style='color:#d0f'>理智斷線！ SAN 減半 (-${drain})</strong>`); 
+                    }
+                }
+
+                // ★★★ 處理物理/狀態效果 (使用處理過的 effectType) ★★★
+                // 把原本代碼中的 skill.eff 全部換成 effectType
+                
+                else if (effectType === 'stun') { 
                     if(isResisted) logMsg.push("<span style='color:#4f4'>你的意志抵抗了暈眩！</span>");
                     else c.buffs.nextStunPlayer = true; 
                 } 
-                else if (skill.eff === 'def_down') { 
+                else if (effectType === 'def_down') { 
                     if(isResisted) logMsg.push("<span style='color:#4f4'>抵抗了破甲效果！</span>");
                     else c.buffs.playerDefDown = true; 
                 }
-                else if (skill.eff === 'acc_down') { 
+                else if (effectType === 'acc_down' || effectType === 'blind') { 
                     if(isResisted) logMsg.push("<span style='color:#4f4'>抵抗了致盲效果！</span>");
                     else c.buffs.playerAccDown = true; 
                 }
-                else if (skill.eff === 'poison' || skill.eff === 'poison_aoe') {
-                     if(isResisted) logMsg.push("<span style='color:#4f4'>免疫了毒素！</span>");
-                     else {
-                         let pDmg = Math.floor(G.maxHp * 0.05);
-                         G.hp -= pDmg;
-                         logMsg.push(`中毒受到 ${pDmg} 傷害`);
-                     }
-                }
-                else if (skill.eff === 'san_dmg') { 
-                    if(isResisted) logMsg.push("<span style='color:#4f4'>堅定的意志抵擋了精神污染！</span>");
-                    else { G.san -= 10; logMsg.push("SAN值受損！"); }
-                }
-                else if (skill.eff === 'hp_halve') { 
-                    // 生命減半是大招，意志可以減免部分效果而不是完全免疫
-                    if(isResisted) { eDmg = Math.floor(G.hp * 0.25); logMsg.push("意志減輕了重力壓制 (傷害減半)"); }
+                else if (effectType === 'poison' || effectType === 'poison_aoe') {
+         // 生化呼吸器 (gas_heal)：中毒轉回血
+         if (G.eq.head && G.eq.head.fx && G.eq.head.fx.t === 'gas_heal') {
+             let heal = Math.floor(G.maxHp * 0.05);
+             G.hp = Math.min(G.maxHp, G.hp + heal);
+             logMsg.push(`<span style='color:#4f4'>☣️ 毒氣轉化為治療 (+${heal})</span>`);
+         }
+         // 瘟疫醫生面具 (poison_imm)：免疫中毒
+         else if (isResisted || (G.eq.head && G.eq.head.fx && G.eq.head.fx.t === 'poison_imm') || isImmuneAll) {
+             logMsg.push("<span style='color:#4f4'>免疫了毒素！</span>");
+         }
+         else {
+             let pDmg = Math.floor(G.maxHp * 0.05);
+             G.hp -= pDmg;
+             logMsg.push(`中毒受到 ${pDmg} 傷害`);
+         }
+    }
+                else if (effectType === 'hp_halve') { 
+                    if(isResisted) { eDmg = Math.floor(G.hp * 0.25); logMsg.push("意志減輕了重力壓制"); }
                     else { eDmg = Math.floor(G.hp * 0.5); logMsg.push("生命被強制減半！"); }
                 }
-                else if (skill.eff === 'crit') { eDmg = Math.floor(eDmg * 1.5); logMsg.push("暴擊傷害！"); }
-                else if (skill.eff === 'double_hit') { eDmg = Math.floor(eDmg * 0.8); c.buffs.doubleHit = true; }
-                else if (skill.eff === 'aoe') { eDmg = Math.floor(eDmg * 1.2); }
-                else if (skill.eff === 'heal_self') { let h = Math.floor(c.maxHp * 0.1); c.hp += h; logMsg.push(`恢復了 ${h} HP`); }
-                else if (skill.eff === 'atk_up') { c.atk = Math.floor(c.atk * 1.2); logMsg.push("攻擊力提升！"); }
-                else if (skill.eff === 'def_up') { c.buffs.defUp = 3; logMsg.push("防禦力提升！"); }
-                else if (skill.eff === 'def_down') { c.buffs.playerDefDown = true; }
-                else if (skill.eff === 'acc_down') { c.buffs.playerAccDown = true; }
-                else if (skill.eff === 'hp_halve') { eDmg = Math.floor(G.hp * 0.5); logMsg.push("生命減半！"); }
-                else if (skill.eff === 'san_dmg') { G.san -= 10; logMsg.push("SAN值受損！"); }
-                else if (skill.eff === 'kill' && !G.isDefending) { eDmg = 999; logMsg.push("即死攻擊！"); }
-                else if (skill.eff === 'dodge_up') { c.buffs.dodgeUp = 3; logMsg.push("變得難以捉摸！"); }
-                else if (skill.eff === 'shield') { c.enemyShield += 100; logMsg.push("獲得護盾！"); }
-            } else if (c.enemySkillCD > 0) {
+                else if (effectType === 'crit') { eDmg = Math.floor(eDmg * 1.5); logMsg.push("暴擊傷害！"); }
+                else if (effectType === 'double_hit') { eDmg = Math.floor(eDmg * 0.8); c.buffs.doubleHit = true; }
+                else if (effectType === 'aoe') { eDmg = Math.floor(eDmg * 1.2); }
+                else if (effectType === 'heal_self') { let h = Math.floor(c.maxHp * 0.1); c.hp += h; logMsg.push(`恢復了 ${h} HP`); }
+                else if (effectType === 'atk_up') { c.atk = Math.floor(c.atk * 1.2); logMsg.push("攻擊力提升！"); }
+                else if (effectType === 'def_up') { c.buffs.defUp = 3; logMsg.push("防禦力提升！"); }
+                else if (effectType === 'acc_up') { c.buffs.accUp = 3; logMsg.push("命中率提升！"); }
+                else if (effectType === 'dodge_up') { c.buffs.dodgeUp = 3; logMsg.push("變得難以捉摸！"); }
+                else if (effectType === 'kill' && !G.isDefending) { eDmg = 999; logMsg.push("即死攻擊！"); }
+                else if (effectType === 'shield') { c.enemyShield += 100; logMsg.push("獲得護盾！"); }
+                else if (effectType === 'burn') { c.playerDebuffs.burn = 3; logMsg.push("被點燃了！"); }
+                else if (effectType === 'bleed') { c.playerDebuffs.bleed = 3; logMsg.push("嚴重流血！"); }
+                else if (effectType === 'sleep') { c.playerDebuffs.sleep = 2; logMsg.push("陷入睡眠！"); }
+
+            }  else if (c.enemySkillCD > 0) {
                 c.enemySkillCD--;
             }
             
@@ -2627,11 +2885,6 @@ function processEnemyTurn(c, logMsg) {
                 if(G.job.passive === 'block_chance' && Math.random()<0.2) { eDmg = Math.floor(eDmg*0.5); logMsg.push("鐵壁格擋"); }
                 if(c.buffs.dance === 'Hozin' && Math.random()<0.2) { eDmg=0; logMsg.push("Hozin格擋"); }
 
-                if (G.job.trait === '抑鬱霸王' && G.flags.depression) {
-                    take = Math.floor(take * 0.5);
-                    logMsg.push("(太抑鬱了, 我變得連敵人的傷害也不再在乎.)");
-                }
-
                 let def = G.eq.body.val + G.eq.head.val;
                 if (c.buffs.playerDefDown) def = 0;
                 let take = Math.max(1, Math.floor((eDmg - def) * (1 - derived.dmgRed/100)));
@@ -2700,15 +2953,32 @@ function processEnemyTurn(c, logMsg) {
                      else { take -= c.playerShield; c.playerShield = 0; }
                 }
 
-                if(take > 0) {
-                    // 小弟擋刀
-                    if(G.job.passive === 'money_shield' && Math.random()<0.1) { take=0; logMsg.push("小弟擋刀"); }
-
-                    if(take > 0) {
+              if(take > 0) {
+                        // ... (原有的減傷代碼) ...
                         if(G.job.passive === 'dmg_reduce' && Math.random()<0.5) take = Math.floor(take * 0.7);
 
                         G.hp -= take; 
                         logMsg.push(`玩家受到 ${Math.floor(take)} 傷害`);
+
+                        // ★★★ 新增：受傷扣除 SAN 值邏輯 ★★★
+                        let sanLoss = 0;
+                        // 1. 重擊恐懼：如果單次受傷超過 10% 最大血量，SAN -3
+                        if (take >= G.maxHp * 0.1) {
+                            sanLoss = 3;
+                        } 
+                        // 2. 普通恐懼：每次受傷有 30% 機率 SAN -1
+                        else if (Math.random() < 0.3) {
+                            sanLoss = 1;
+                        }
+
+                        // 3. 噩夢難度額外懲罰
+                        if (G.diff === 3 && sanLoss > 0) sanLoss += 1;
+
+                        if (sanLoss > 0) {
+                            G.san -= sanLoss;
+                            logMsg.push(`<span style="color:var(--san-color); font-size:0.8em;">(痛楚 SAN -${sanLoss})</span>`);
+                        }
+                        // ======================================
                         
                         // 反傷
                         let reflect = 0;
@@ -2735,7 +3005,7 @@ function processEnemyTurn(c, logMsg) {
                             logMsg.push(`連擊！再次受到 ${take} 傷害`);
                             c.buffs.doubleHit = false;
                         }
-                    }
+
                } else if (isDodged) {
                 let flavor = getCombatFlavor('你', c.n, 0, false, false);
                 logMsg.push(`<div class="log-combat-h">${flavor}</div>`);
@@ -2780,7 +3050,7 @@ function checkCombatEnd(c, logMsg) {
         // ★★★ 修改：Boss 戰勝利邏輯 ★★★
         else if(c.isBoss) { 
             // 1. 生成 Diablo 式掉落列表
-            let loot = generateBossLoot(c.n, c.isQuest);
+            let loot = generateBossLoot(c.baseName, c.isQuest);
             
             // 2. 顯示新視窗
             showBossLootWindow(loot, () => {
@@ -2946,7 +3216,23 @@ function updateUI() {
     document.getElementById('v-day').innerText = `${G.day}`;
     document.getElementById('v-hp').innerText = Math.floor(G.hp);
     document.getElementById('v-max-hp').innerText = Math.floor(G.maxHp);
+
     document.getElementById('v-san').innerText = Math.floor(G.san);
+    // ★★★ 新增：顯示 SAN 狀態 ★★★
+    let ss = getSanityState();
+    let sanEl = document.getElementById('v-san');
+    
+    // 改變顏色與文字
+    if(ss.state === 'calm') {
+        sanEl.style.color = '#4f4'; // 綠色
+        sanEl.innerText = `${Math.floor(G.san)} (冷靜)`;
+    } else if (ss.state === 'madness') {
+        sanEl.style.color = '#f44'; // 紅色
+        sanEl.innerText = `${Math.floor(G.san)} (瘋狂)`;
+    } else {
+        sanEl.style.color = 'var(--san-color)'; // 藍色
+    }
+    // ============================
     document.getElementById('v-food').innerText = Math.floor(G.food);
     document.getElementById('v-water').innerText = Math.floor(G.water);
     document.getElementById('v-ammo').innerText = `(${G.ammo})`;
@@ -3098,6 +3384,12 @@ function createItem(type, specificName, forcedTier, forceCommon = false) {
         if (!tpl) tpl = { n: jobBaseName, v: 10 };
         
         baseItem = JSON.parse(JSON.stringify(tpl)); // 深拷貝
+
+        // ★★★ 【修復點：插入這一行】 ★★★ 
+        // 防止資料庫找不到物品時，fallback 物件沒有 stats 導致後續報錯
+        if (!baseItem.stats) baseItem.stats = {}; 
+        // ==================================
+
         // 專屬裝備數值隨 Tier 成長
         let mul = JOB_TIER_PREFIX[tier - 1].mul;
         baseItem.v = Math.floor(baseItem.v * mul * (1 + G.day/200));
@@ -3963,80 +4255,171 @@ function debugCheat(){
 
 // ==================== 全新動態難度平衡系統 (請貼在文件末尾) ====================
 
-// 1. 計算玩家當前戰力與期望值
+// 1. 計算裝備特效的隱藏權重 (Power Score) - 精細化計算 v3.1
+function calcEquipmentPowerScore() {
+    let score = 1.0; // 基礎權重 100%
+
+    // 遍歷全身裝備
+    for (let key in G.eq) {
+        let item = G.eq[key];
+        if (item && item.fx) {
+            let t = item.fx.t;
+            let v = item.fx.v || 0.1; // 預設值，防止為 0
+
+            // --- 攻擊類特效 ---
+            if (t === 'execute') {
+                // 斬殺是極強屬性。v=0.5 (50%斬殺) 
+                score += 0.1 + (v * 1.5); 
+            }
+            else if (t === 'double_hit') {
+                score += v * 0.8;
+            }
+            else if (t === 'ignore_def' || t === 'true_dmg') {
+                score += 0.1 + (v * 0.5);
+            }
+            else if (t === 'crit_dmg') {
+                score += v * 0.5;
+            }
+            else if (t === 'auto_aim') {
+                score += 0.2; 
+            }
+            else if (t === 'gold_hit') {
+                score += 0.05;
+            }
+
+            // --- 控制類特效 ---
+            else if (t === 'stun_hit' || t === 'freeze_hit' || t === 'hypnosis') {
+                score += 0.15 + (v * 1.2);
+            }
+            else if (t === 'blind_atk' || t === 'slow_hit') {
+                score += 0.1 + (v * 0.5);
+            }
+
+            // --- 生存類特效 ---
+            else if (t === 'lifesteal') {
+                score += 0.2 + (v * 1.0);
+            }
+            else if (t === 'regen') {
+                let regenPct = v / 500;
+                score += regenPct * 2; 
+            }
+            else if (t === 'revive') {
+                score += 0.6; 
+            }
+            else if (t === 'dodge_lucky' || t === 'parry') {
+                score += 0.1 + (v * 0.8);
+            }
+            else if (t === 'grit' || t === 'tough_skin') {
+                score += 0.15;
+            }
+            else if (t === 'immune' || t === 'poison_imm' || t === 'stun_res') {
+                score += 0.15; 
+            }
+        }
+    }
+
+    // 職業技能修正
+    if (G.job.sk === 'kid_squad') score += 0.3; 
+    if (G.job.sk === 'god_hand') score += 0.25; 
+    if (G.job.sk === 'one_cue') score += 0.4;   
+    if (G.job.sk === 'time_stop') score += 0.5; 
+
+    return score;
+}
+// 2. 計算玩家綜合戰力 (DPS & EHP) - v4.0 修正版 (讓玩家享受神裝優勢)
 function getPlayerCombatPower() {
-    // A. 計算玩家最佳輸出 (考慮暴擊期望值)
+    // A. 基礎面板
     let s = getStat('s'), a = getStat('a');
     let meleeRaw = getEquipVal(G.eq.melee) + s;
     let rangedRaw = getEquipVal(G.eq.ranged) + a;
     let baseAtk = Math.max(meleeRaw, rangedRaw);
     
-    // 暴擊期望修正
+    // B. 暴擊期望
     let derived = calcDerivedStats();
     let critChance = Math.min(100, derived.crit) / 100;
-    let expAtk = baseAtk * (1 + (critChance * 0.5));
+    let critDmgMult = (derived.critDmg || 150) / 100;
+    let expAtk = baseAtk * (1 + (critChance * (critDmgMult - 1)));
 
-    // B. 計算玩家防禦與減傷
+    // C. 生存
     let def = getEquipVal(G.eq.head) + getEquipVal(G.eq.body);
     let reducPct = Math.min(80, derived.dmgRed) / 100; 
+    
+    // ★★★ 修正核心：特效權重「鈍化」處理 ★★★
+    let rawScore = calcEquipmentPowerScore(); 
+    
+    // 我們不直接乘上 rawScore (例如 1.85)，因為那會完全抵消裝備優勢
+    // 我們使用「開根號」或者「打折」的方式，讓系統只追趕一部分強度
+    // 例如：玩家強了 85%，系統只增強 40%
+    // 公式：1 + (增幅部分 * 0.5)
+    let dampedScore = 1 + ((rawScore - 1) * 0.5);
+
+    let finalAtk = Math.max(5, Math.floor(expAtk * dampedScore));
 
     return { 
-        atk: Math.max(5, Math.floor(expAtk)), 
+        atk: finalAtk, 
         def: def, 
         hp: G.maxHp, 
-        reduc: reducPct 
+        reduc: reducPct,
+        powerScore: rawScore // 傳遞原始分數備用，但不影響核心數值
     };
 }
 
-// 2. 核心：根據類型生成動態數值 (v2.0 優化版)
+// 3. 核心：根據類型生成動態數值 (v4.0 - 移除懲罰)
 function getDynamicEnemyStats(type) {
     let p = getPlayerCombatPower();
     let diff = G.diff; 
 
-    // 隨機波動 0.8 ~ 1.2
-    let variance = 0.8 + Math.random() * 0.4; 
+    let variance = 0.85 + Math.random() * 0.3; 
 
-    // 設定目標節奏
-    let target = { playerTurns: 2.2, enemyTurns: 10 }; 
+    // 目標節奏
+    let target = { playerTurns: 2.5, enemyTurns: 10 }; 
 
     if (type === 'elite') {
         target.playerTurns = 6;
         target.enemyTurns = 7;
     } else if (type === 'boss') {
-        target.playerTurns = 12;
-        target.enemyTurns = 4.5;
+        target.playerTurns = 14; 
+        target.enemyTurns = 5;   
     } else if (type === 'final_boss') {
-        target.playerTurns = 18;
-        target.enemyTurns = 3.5;
+        target.playerTurns = 20;
+        target.enemyTurns = 4;
         variance = 1.0; 
     }
 
     let hpMult = 1.0;
     let atkMult = 1.0;
 
-    if (diff === 2) { hpMult = 1.25; atkMult = 1.2; }
-    else if (diff === 3) { hpMult = 1.6; atkMult = 1.4; }
+    if (diff === 2) { hpMult = 1.3; atkMult = 1.2; }
+    else if (diff === 3) { hpMult = 1.8; atkMult = 1.5; }
 
-    // 成長係數衰減 (讓玩家感覺變強)
+    // ★★★ 關鍵修正：移除了針對高 PowerScore 的額外懲罰代碼 ★★★
+    // 現在讓玩家盡情享受神裝帶來的數值碾壓感
+
+    // 成長係數 (0.85) - 保持不變，確保基礎成長感
     let scalingFactor = 0.85; 
     let adjustedAtk = p.atk * scalingFactor;
-    adjustedAtk += (G.day * 2); 
+    adjustedAtk += (G.day * 2.5); 
 
     let eHP = Math.floor(adjustedAtk * target.playerTurns * hpMult * variance);
 
+    // 計算敵人攻擊力
     let requiredNetDmg = p.hp / target.enemyTurns;
+    
+    // 依然保留對吸血/回血的輕微抵抗，否則玩家會無敵
+    if (p.powerScore > 1.4) requiredNetDmg *= 1.1;
+
     let effectiveReduc = Math.max(0.1, 1 - p.reduc); 
     let rawDmgNeeded = requiredNetDmg / effectiveReduc;
     
     let eAtk = Math.floor((rawDmgNeeded + p.def) * atkMult * variance);
 
     // 天數保底
-    let dayScale = 1 + (G.day * 0.12); 
-    let minHP = 35 * dayScale;
-    let minAtk = 8 + (G.day * 0.6);
+    let dayScale = 1 + (G.day * 0.15); 
+    let minHP = 40 * dayScale;
+    let minAtk = 10 + (G.day * 0.7);
 
-    if (type === 'boss' || type === 'elite') { minHP *= 4; minAtk *= 1.5; }
-    if (type === 'final_boss') { minHP = 10000; minAtk = 250; } 
+    if (type === 'boss' || type === 'elite') { minHP *= 4.5; minAtk *= 1.6; }
+    if (type === 'final_boss') { minHP = 12000; minAtk = 280; } 
 
     eHP = Math.max(eHP, Math.floor(minHP));
     eAtk = Math.max(eAtk, Math.floor(minAtk));
@@ -4184,6 +4567,275 @@ function closeBossLoot() {
     if(window.bossLootCallback) window.bossLootCallback();
 }
 
+// 取得當前精神狀態及其加成
+function getSanityState() {
+    if (G.san >= 75) {
+        return { 
+            state: 'calm', 
+            name: '🔵 冷靜', 
+            desc: '專注力提升 (命中+20%, 閃避+10%, 防禦+10%)',
+            buffs: { acc: 20, dodge: 10, defP: 0.1 } 
+        };
+    } else if (G.san < 30) {
+        return { 
+            state: 'madness', 
+            name: '🔴 瘋狂', 
+            desc: '腎上腺素爆發 (攻擊+30%, 暴擊+15%, 防禦-30%, 機率幻覺)',
+            buffs: { atkPct: 0.3, crit: 15, defP: -0.3, hallucination: 0.15 } // 15%機率空過
+        };
+    } else {
+        return { 
+            state: 'normal', 
+            name: '⚪ 正常', 
+            desc: '精神狀態穩定',
+            buffs: {} 
+        };
+    }
+}
+
+// === 新技能系統核心 ===
+
+function openSkillMenu() {
+    if (!G.combat.skillCDs) G.combat.skillCDs = {};
+    
+    let html = `<div style="display:grid; gap:8px; max-height:60vh; overflow-y:auto;">`;
+    
+G.unlockedSkills.forEach(sid => {
+        // --- 修改開始：加入保底資料，防止技能消失 ---
+        let s = SKILL_DB[sid];
+        if (!s) {
+            // 如果資料庫找不到這招，手動生成一個「未知技能」物件，而不是 return 跳過
+            s = { 
+                n: `未知技能 (${sid})`, 
+                desc: "資料庫中找不到此技能定義，請檢查 SKILL_DB.json", 
+                cost: {}, 
+                cd: 0 
+            };
+        }
+        // --- 修改結束 ---
+        
+        let cd = G.combat.skillCDs[sid] || 0;
+        let costText = [];
+        let canAfford = true;
+        
+        // 計算消耗顯示
+        if (s.cost) {
+            if (s.cost.hp) { 
+                costText.push(`<span style="color:#f44">HP-${s.cost.hp}</span>`);
+                if (G.hp <= s.cost.hp) canAfford = false;
+            }
+            if (s.cost.san) {
+                costText.push(`<span style="color:#88f">SAN-${s.cost.san}</span>`);
+                if (G.san < s.cost.san) canAfford = false;
+            }
+            if (s.cost.food) {
+                costText.push(`<span style="color:#fa0">飽-${s.cost.food}</span>`);
+                if (G.food < s.cost.food) canAfford = false;
+            }
+            if (s.cost.money) {
+                costText.push(`<span style="color:#ffd700">$${s.cost.money}</span>`);
+                if (G.money < s.cost.money) canAfford = false;
+            }
+        }
+        
+        let btnStyle = `background:#222; border:1px solid #444; padding:10px; display:flex; justify-content:space-between; align-items:center; text-align:left;`;
+        let statusHtml = '';
+        let disabled = '';
+        
+        if (cd > 0) {
+            statusHtml = `<span style="color:#f44; font-weight:bold;">CD: ${cd}</span>`;
+            btnStyle = `background:#111; border:1px solid #333; opacity:0.6;`;
+            disabled = 'disabled';
+        } else if (!canAfford) {
+            statusHtml = `<span style="color:#888;">消耗不足</span>`;
+            btnStyle = `background:#111; border:1px solid #333; opacity:0.6;`;
+            disabled = 'disabled';
+        } else {
+            statusHtml = `<span style="color:#4f4; font-weight:bold;">就緒</span>`;
+            btnStyle += ` cursor:pointer; border-color:#fa0;`;
+        }
+        
+        html += `<button onclick="performSkill('${sid}')" ${disabled} style="${btnStyle} width:100%;">
+            <div>
+                <div style="font-weight:bold; font-size:1.1em; color:#fff;">${s.n}</div>
+                <div style="font-size:0.8em; color:#ccc; margin-top:2px;">${s.desc}</div>
+                <div style="font-size:0.75em; margin-top:4px;">消耗: ${costText.join(' ') || '無'}</div>
+            </div>
+            <div>${statusHtml}</div>
+        </button>`;
+    });
+    
+    html += `</div>`;
+    openModal("⚡ 選擇技能", html, `<button onclick="closeModal()">取消</button>`);
+}
+
+// 萬能技能解析器
+// 優化版：支援詳細日誌與混合傷害的技能解析器
+function performSkill(sid) {
+    let s = SKILL_DB[sid];
+    let c = G.combat;
+    let logMsg = [];
+    
+    // 定義屬性中文名稱映射
+    const STAT_NAMES = {
+        atkUp: "攻擊力", defUp: "防禦力", dodgeUp: "閃避率", accUp: "命中率",
+        atkDown: "攻擊力", defDown: "防禦力", accDown: "命中率",
+        bleed: "流血", burn: "燃燒", blind: "致盲", sleep: "睡眠",
+        stun: "暈眩", root: "定身"
+    };
+
+    closeModal();
+    
+    // 1. 支付消耗
+    if (s.cost) {
+        if (s.cost.hp) G.hp -= s.cost.hp;
+        if (s.cost.san) G.san -= s.cost.san;
+        if (s.cost.food) G.food -= s.cost.food;
+        if (s.cost.money) G.money -= s.cost.money;
+    }
+    
+    // 2. 設定冷卻
+    if (!c.skillCDs) c.skillCDs = {};
+    c.skillCDs[sid] = s.cd;
+    
+    // 3. 基礎數值計算 (Power)
+    let power = 0;
+    let stats = ['s','a','i','w','luck'];
+    if (s.scale) {
+        stats.forEach(stat => {
+            if (s.scale[stat]) {
+                power += getStat(stat) * s.scale[stat];
+            }
+        });
+        if (s.scale.fixed) power += s.scale.fixed;
+    }
+    
+    // 4. 執行效果
+    let totalDmg = 0;
+    
+    if (s.effects) {
+        s.effects.forEach(eff => {
+            // --- A. 傷害類 ---
+            if (eff.t === 'dmg') {
+                let base = power;
+                if (eff.var) base *= (1 + (Math.random() * eff.var - (eff.var/2)));
+                // 技能基礎傷害通常不加上武器傷害，除非是普攻類技能，但為了平衡初期體驗，這裡保留微量武器加成
+                let weaponDmg = (getEquipVal(G.eq.melee) + getEquipVal(G.eq.ranged)) / 2;
+                totalDmg += Math.floor(base + (weaponDmg * 0.5));
+            }
+            else if (eff.t === 'dmg_multi') {
+                let hits = eff.hits || 2;
+                let dmgPerHit = Math.floor(power * 0.4); 
+                for(let i=0; i<hits; i++) {
+                    totalDmg += dmgPerHit;
+                    logMsg.push(`連擊`);
+                }
+            }
+            else if (eff.t === 'true_dmg_day') { 
+                totalDmg += (G.day * (eff.factor || 1));
+                c.buffs.ignoreDef = 1;
+            }
+            else if (eff.t === 'execute') { 
+                let threshold = eff.limit || 0.3; 
+                if (c.hp < c.maxHp * threshold) {
+                    totalDmg += Math.floor(power * 3);
+                    logMsg.push(`<strong style="color:#f00">斬殺!</strong>`);
+                } else {
+                    totalDmg += Math.floor(power * 0.5);
+                }
+            }
+            
+            // --- B. 恢復類 ---
+            else if (eff.t === 'heal_hp') {
+                let amt = Math.floor(eff.v + (power * 0.5));
+                G.hp = Math.min(G.maxHp, G.hp + amt);
+                logMsg.push(`<span style="color:#4f4">HP +${amt}</span>`);
+            }
+            else if (eff.t === 'heal_san') {
+                G.san = Math.min(100, G.san + eff.v);
+                logMsg.push(`<span style="color:#88f">SAN +${eff.v}</span>`);
+            }
+            
+            // --- C. 防禦/控制類 ---
+            else if (eff.t === 'shield') {
+                let val = Math.floor(eff.v + power);
+                c.playerShield += val;
+                logMsg.push(`<span style="color:#fa0">護盾 +${val}</span>`);
+            }
+            else if (eff.t === 'stun') {
+                c.isStunned = true;
+                c.buffs.stun = (c.buffs.stun || 0) + eff.v;
+                logMsg.push(`<span style="color:#fa0">暈眩 ${eff.v} 回</span>`);
+            }
+            
+            // --- D. Buff/Debuff (大幅優化顯示邏輯) ---
+            else if (eff.t === 'buff') {
+                c.buffs[eff.k] = (c.buffs[eff.k] || 0) + eff.v;
+                let name = STAT_NAMES[eff.k] || eff.k;
+                let desc = eff.desc ? `${eff.desc} (${name} +${eff.v})` : `${name}提升 (+${eff.v})`;
+                logMsg.push(`<span style="color:#4f4">${desc}</span>`);
+            }
+            else if (eff.t === 'debuff') {
+                // 特殊處理流血和燃燒
+                if (eff.k === 'bleed' || eff.k === 'burn') {
+                    c.buffs[eff.k] = (c.buffs[eff.k] || 0) + eff.v;
+                    let name = STAT_NAMES[eff.k];
+                    logMsg.push(`<span style="color:#f44">${name} ${eff.v}層</span>`);
+                } else {
+                    c.buffs[eff.k] = (c.buffs[eff.k] || 0) + eff.v;
+                    let name = STAT_NAMES[eff.k] || eff.k;
+                    let desc = eff.desc ? `${eff.desc} (${name} -${eff.v})` : `${name}下降 (-${eff.v})`;
+                    logMsg.push(`<span style="color:#a0f">${desc}</span>`);
+                }
+            }
+        });
+    }
+    
+    // 5. 輸出日誌
+    log('技能', `<span style="color:#ffd700; font-weight:bold">${s.n}</span>: ${s.log || ''}`, 'c-skill');
+    if (logMsg.length > 0) log('效果', logMsg.join(', '));
+    
+    // 6. 傷害結算
+    if (totalDmg > 0) {
+        let eDef = Math.floor(c.maxHp * 0.05);
+        if (c.buffs.defDown) eDef = Math.floor(eDef * 0.5);
+        if (c.buffs.ignoreDef) { eDef = 0; c.buffs.ignoreDef = 0; }
+        
+        let realDmg = Math.max(1, Math.floor(totalDmg - eDef));
+        
+        if (c.enemyShield > 0) {
+            if (c.enemyShield >= realDmg) {
+                c.enemyShield -= realDmg; realDmg = 0;
+                log('戰鬥', "傷害被護盾抵擋");
+            } else {
+                realDmg -= c.enemyShield; c.enemyShield = 0;
+            }
+        }
+        
+        if (realDmg > 0) {
+            c.hp -= realDmg;
+            log('戰鬥', `💥 技能造成 <strong>${realDmg}</strong> 點傷害`);
+            triggerShake();
+        }
+    }
+    
+    updateUI();
+    
+    if (c.hp <= 0) {
+        checkCombatEnd(c, [`${c.n} 被技能擊敗`]);
+    } else {
+        processEnemyTurn(c, []);
+        if (c.playerDebuffs && c.playerDebuffs.stun > 0) {
+            log('系統', '你被擊暈了！', 'c-loss');
+            updateUI();
+            renderCombat(); 
+            return;
+        }
+        checkCombatEnd(c, []);
+    }
+}
+
+
 
 // Export all functions to window at once
 const globalFunctions = {
@@ -4228,6 +4880,9 @@ const globalFunctions = {
     triggerShake,
     pickUpBossLoot, 
     closeBossLoot, 
+    openSkillMenu,
+    performSkill,
 };
 
 Object.assign(window, globalFunctions);
+window.G = G;
