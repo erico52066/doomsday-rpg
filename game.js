@@ -4386,6 +4386,16 @@ function getDynamicEnemyStats(type) {
         variance = 1.0; 
     }
 
+     // --- ★★★ 修改開始：階梯式難度係數 (Time Scaling) ★★★ ---
+    let timeScale = 1.0;
+    if (G.day <= 30) {
+        timeScale = 0.6; // 新手保護期：怪物強度 60%
+    } else if (G.day <= 60) {
+        timeScale = 0.8; // 過渡期：怪物強度 80% (避免斷層)
+    }
+    // Day 60+ 恢復 100% 強度
+    // -----------------------------------------------------
+    
     let hpMult = 1.0;
     let atkMult = 1.0;
 
@@ -4400,8 +4410,13 @@ function getDynamicEnemyStats(type) {
     let adjustedAtk = p.atk * scalingFactor;
     adjustedAtk += (G.day * 2.5); 
 
-    let eHP = Math.floor(adjustedAtk * target.playerTurns * hpMult * variance);
-
+    // Day 30 前降低天數成長幅度，避免成長太快
+    let dayGrowth = (G.day <= 30) ? (G.day * 1.5) : (G.day * 2.5);
+    adjustedAtk += dayGrowth; 
+    
+     // 應用 timeScale
+    let eHP = Math.floor(adjustedAtk * target.playerTurns * hpMult * variance * timeScale);
+    
     // 計算敵人攻擊力
     let requiredNetDmg = p.hp / target.enemyTurns;
     
@@ -4411,13 +4426,13 @@ function getDynamicEnemyStats(type) {
     let effectiveReduc = Math.max(0.1, 1 - p.reduc); 
     let rawDmgNeeded = requiredNetDmg / effectiveReduc;
     
-    let eAtk = Math.floor((rawDmgNeeded + p.def) * atkMult * variance);
+    let eAtk = Math.floor((rawDmgNeeded + p.def) * atkMult * variance * timeScale);
 
-    // 天數保底
+    // 天數保底 (同樣應用 timeScale)
     let dayScale = 1 + (G.day * 0.15); 
-    let minHP = 40 * dayScale;
-    let minAtk = 10 + (G.day * 0.7);
-
+    let minHP = 40 * dayScale * timeScale;
+    let minAtk = 10 + (G.day * 0.7) * timeScale;
+    
     if (type === 'boss' || type === 'elite') { minHP *= 4.5; minAtk *= 1.6; }
     if (type === 'final_boss') { minHP = 12000; minAtk = 280; } 
 
