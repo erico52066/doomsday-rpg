@@ -393,8 +393,6 @@ function showJobIntro() {
 
 function startJourney() {
     closeModal();
-    showGameContainer();
-
     G.day = 1; 
     log('系統', '旅程開始。', 'c-story');
     updateUI();
@@ -930,7 +928,6 @@ function getEventReward() {
 function storyChoose(type, statKey, isBoss, bossName, isQuest) {
     if (isBoss) {
         closeModal();
-        showGameContainer();
         let targetName = bossName || '區域領主';
         triggerBossFight(targetName, isQuest);
         return;
@@ -1467,7 +1464,7 @@ function abandonQuest() {
 
 // ==================== 戰鬥與物品 ====================
 function triggerBossFight(name, isQuest=false) { 
-    // ★★★ 使用動態計算 (新代碼) ★★★
+    // 使用動態計算
     let typeKey = (name === "最終屍王") ? 'final_boss' : 'boss';
     let stats = getDynamicEnemyStats(typeKey);
 
@@ -1475,25 +1472,27 @@ function triggerBossFight(name, isQuest=false) {
     let atk = stats.atk;
     let bossDodge = (getCurrentTier() - 1) * 10 + 5; 
 
-    // ★★★ 新增：Boss 開場威壓 ★★★
-    let terror = 10; // 基礎扣 10
-    if (name === "最終屍王") terror = 20; // 屍王扣 20
-    if (G.diff === 3) terror = Math.floor(terror * 1.5); // 噩夢加成
+    // Boss 開場威壓
+    let terror = 10; 
+    if (name === "最終屍王") terror = 20; 
+    if (G.diff === 3) terror = Math.floor(terror * 1.5); 
 
-    // 意志力(Will) 可以抵消部分恐懼
     let willMitigation = Math.floor(getStat('w') * 0.5);
     terror = Math.max(1, terror - willMitigation);
 
     G.san -= terror;
     log('遭遇', `強敵的壓迫感讓你呼吸困難！ <span style="color:var(--san-color)">SAN -${terror}</span>`, 'c-loss');
-    // ============================
 
     if (name === "最終屍王") {
         bossDodge = 50; 
-        // 最終Boss給予額外的壓力係數
         hp = Math.floor(hp * 1.2);
         atk = Math.floor(atk * 1.1);
     }
+
+    // ★★★ 計算 Boss 固定防禦力 ★★★
+    let tier = getCurrentTier();
+    let bossDef = (tier * 10) + (G.diff === 3 ? 10 : 0);
+    if (name === "最終屍王") bossDef = 50;
 
     G.activeSkillCD = 0; 
     G.playerDefCD = 0;
@@ -1504,6 +1503,12 @@ function triggerBossFight(name, isQuest=false) {
         maxHp:hp, 
         hp:hp, 
         atk:atk, 
+        
+        // ★★★ 修正後的防禦屬性 ★★★
+        def: bossDef,
+        defP: 0.15, // Boss 預設 15% 減傷
+        // ========================
+
         sk:'終極毀滅', 
         isBoss:true, 
         isQuest:isQuest, 
@@ -1515,10 +1520,21 @@ function triggerBossFight(name, isQuest=false) {
         isStunned: false, 
         playerShield: 0, 
         usedItem: false,
-        dodge: bossDodge,
-        defP: 0.15 // Boss 自帶 15% 減傷
+        dodge: bossDodge
     };
     
+    // ★★★ 新增：Boss 裝備開場特效 (同步加入) ★★★
+    if (G.eq.head && G.eq.head.fx && G.eq.head.fx.t === 'fear_aura') {
+        if (Math.random() < 0.5) {
+            G.combat.buffs.atkDown = 3;
+            log('裝備', `🤡 小丑面具發動：${G.combat.n} 感到恐懼 (攻擊下降)`);
+        }
+    }
+    if (G.eq.acc && G.eq.acc.fx && G.eq.acc.fx.t === 'hypnosis') {
+        G.combat.buffs.sleep = 3;
+        log('裝備', `📻 洗腦廣播發動：${G.combat.n} 陷入深層睡眠`);
+    }
+
     log('遭遇', `強敵出現：${name} (HP:${hp}, ATK:${atk})`, 'c-loss');
     
     let eArea = document.getElementById('enemy-area');
@@ -1527,8 +1543,7 @@ function triggerBossFight(name, isQuest=false) {
     renderCombat();
 }
 
-// ==================== 替換原有的 triggerCombat ====================
-
+// ==================== 替換原有的 triggerCombat ====================    
 function triggerCombat(enemyTemplate, danger) { 
     let locationName = window.currentLocName || "民居";
     let tier = getCurrentTier();
@@ -1574,7 +1589,7 @@ function triggerCombat(enemyTemplate, danger) {
     enemy = JSON.parse(JSON.stringify(enemy));
     let originalName = enemy.n; 
 
-    // ★★★ 2. 應用動態數值平衡 (新代碼) ★★★
+    // 2. 應用動態數值平衡
     let typeKey = isBoss ? 'boss' : (isElite ? 'elite' : 'normal');
     let stats = getDynamicEnemyStats(typeKey);
     
@@ -1618,6 +1633,10 @@ function triggerCombat(enemyTemplate, danger) {
     let xp = Math.max(1, Math.floor((danger || 1) * (isBoss ? 5 : isElite ? 2 : 1)));
     if (prefixData) xp = Math.floor(xp * 1.5);
 
+    // ★★★ 計算固定防禦力 (新平衡) ★★★
+    let baseDefVal = (tier - 1) * 5 + (isBoss ? 5 : 0) + (isElite ? 2 : 0);
+    let finalDef = baseDefVal + Math.floor(Math.random() * 5);
+
     G.activeSkillCD = 0;
     G.playerDefCD = 0;
 
@@ -1628,8 +1647,13 @@ function triggerCombat(enemyTemplate, danger) {
         maxHp: hp, 
         hp: hp, 
         atk: atk, 
+        
+        // ★★★ 修正後的防禦屬性 ★★★
+        def: finalDef,          // 固定防禦
+        defP: enemy.defP || 0,  // 百分比減傷 (記得這裡要有逗號)
+        // ========================
+
         dodge: finalDodge,
-        defP: enemy.defP || 0, 
         acc: enemy.acc || 0,   
         crit: enemy.crit || 0, 
         isBoss: isBoss, 
@@ -1647,6 +1671,18 @@ function triggerCombat(enemyTemplate, danger) {
         isStunned: false, 
         usedItem: false 
     };
+
+    // ★★★ 新增：Boss 裝備開場特效 ★★★
+    if (G.eq.head && G.eq.head.fx && G.eq.head.fx.t === 'fear_aura') {
+        if (Math.random() < 0.5) {
+            G.combat.buffs.atkDown = 3;
+            log('裝備', `🤡 小丑面具發動：${G.combat.n} 感到恐懼 (攻擊下降)`);
+        }
+    }
+    if (G.eq.acc && G.eq.acc.fx && G.eq.acc.fx.t === 'hypnosis') {
+        G.combat.buffs.sleep = 3;
+        log('裝備', `📻 洗腦廣播發動：${G.combat.n} 陷入深層睡眠`);
+    }
 
     if(!G.combat.sk) G.combat.sk = '普通攻擊'; 
 
@@ -1795,8 +1831,9 @@ function renderCombat() {
 
 // --- 修改開始：計算基礎值與當前值，並生成差異顯示 ---
     
-    // 1. 防禦力 (Base: MaxHP * 5%)
-    let baseDef = Math.floor(c.maxHp * 0.05);
+    // --- 修改：讀取固定防禦力 ---
+    // 1. 防禦力 (Base: c.def)
+    let baseDef = c.def || 0; // 讀取 G.combat.def
     let curDef = baseDef;
     if(c.buffs.defDown) curDef = Math.floor(curDef * 0.5);
     if(c.buffs.defUp) curDef = Math.floor(curDef * 1.5);
@@ -2485,7 +2522,7 @@ function combatRound(act) {
     } else if (act === 'defend') {
         G.isDefending = true; G.playerDefCD = 3; logMsg.push("🛡️ 防禦姿態");
     } else if (act === 'flee') {
-        if (Math.random() < 0.5) { campPhase(); return; }
+        if (Math.random() < 0.5) { campPhase(); return true; }
         logMsg.push("🏃 逃跑失敗");
     }
 
@@ -2533,55 +2570,63 @@ function combatRound(act) {
                 logMsg.push(`🛡️ 無視防禦！`);
             }
         }
-
-    // === 4. 最終傷害扣除 ===
-    if (dmg > 0) {
-        // 扣除防禦
-        let eDef = Math.floor(c.maxHp * 0.05);
-        if (c.buffs.defDown) eDef = Math.floor(eDef * 0.5);
-        if (c.buffs.ignoreDef) eDef = 0;
-
-        let realDmg = Math.max(1, Math.floor(dmg - eDef));
-
-        // ★★★ 新增：敵人詞綴減傷 (defP) ★★★
-        if (c.defP > 0 && !c.buffs.ignoreDef) {
-            realDmg = Math.floor(realDmg * (1 - c.defP));
-        }
-
-        // 護盾抵扣
-        if (c.enemyShield > 0) {
-            if (c.enemyShield >= realDmg) {
-                c.enemyShield -= realDmg; realDmg = 0; logMsg.push("🛡️ 傷害被護盾抵擋");
-            } else {
-                realDmg -= c.enemyShield; c.enemyShield = 0; logMsg.push("⚡ 擊破護盾！");
-            }
-        }
-
-
-
-        // 扣血
-        if (realDmg > 0) {
-            c.hp -= realDmg;
-            logMsg.push(`💥 造成 <strong>${realDmg}</strong> 點傷害`);
+	 
+// === 4. 最終傷害扣除 (含平衡修正) ===
+        if (dmg > 0) {
+            // 讀取固定防禦力
+            let eDef = c.def || 0;
             
-             // ★★★ 新增：敵人詞綴反傷 (Thorns) ★★★
-            if (c.prefixEff === 'thorns' || c.prefixEff === 'thorns_light' || c.prefixEff === 'thorns_heavy') {
-                let rate = (c.prefixEff==='thorns_heavy') ? 0.4 : (c.prefixEff==='thorns') ? 0.2 : 0.1;
-                let thornsDmg = Math.floor(realDmg * rate);
-                if (thornsDmg > 0) {
-                    G.hp -= thornsDmg;
-                    logMsg.push(`<span style="color:#f44">⚡ 受到反傷 -${thornsDmg}</span>`);
+            // 應用 Debuff
+            if (c.buffs.defDown) eDef = Math.floor(eDef * 0.5);
+            if (c.buffs.ignoreDef) eDef = 0;
+
+            // 計算減傷後傷害
+            let reducedDmg = dmg - eDef;
+            
+            // ★★★ 核心修正：最小傷害機制 (10% 面板傷害) ★★★
+            // 確保即使不破防，也能造成 10% 的傷害，避免絕望感
+            let minDmg = Math.floor(dmg * 0.1); 
+            let realDmg = Math.max(minDmg, reducedDmg);
+            realDmg = Math.max(1, Math.floor(realDmg)); // 保底 1 點
+            // ==========================================
+
+            // 詞綴減傷 (百分比)
+            if (c.defP > 0 && !c.buffs.ignoreDef) {
+                realDmg = Math.floor(realDmg * (1 - c.defP));
+            }
+
+            // 護盾抵扣 (保持不變)
+            if (c.enemyShield > 0) {
+                if (c.enemyShield >= realDmg) {
+                    c.enemyShield -= realDmg; realDmg = 0; logMsg.push("🛡️ 傷害被護盾抵擋");
+                } else {
+                    realDmg -= c.enemyShield; c.enemyShield = 0; logMsg.push("⚡ 擊破護盾！");
                 }
             }
 
-            let isCrit = (dmg > getDmgEst(act) * 1.2); 
-            let flavor = getCombatFlavor('你', c.n, act, realDmg, isCrit, false);
-            logMsg.push(`<div class="log-combat-h">${flavor}</div>`);
+            // 執行扣血
+            if (realDmg > 0) {
+                c.hp -= realDmg;
+                logMsg.push(`💥 造成 <strong>${realDmg}</strong> 點傷害`);
+                
+                // ... (反傷與日誌代碼保持不變) ...
+                if (c.prefixEff === 'thorns' || c.prefixEff === 'thorns_light' || c.prefixEff === 'thorns_heavy') {
+                    let rate = (c.prefixEff==='thorns_heavy') ? 0.4 : (c.prefixEff==='thorns') ? 0.2 : 0.1;
+                    let thornsDmg = Math.floor(realDmg * rate);
+                    if (thornsDmg > 0) {
+                        G.hp -= thornsDmg;
+                        logMsg.push(`<span style="color:#f44">⚡ 受到反傷 -${thornsDmg}</span>`);
+                    }
+                }
 
-            G.lastDmg = realDmg;            
-            triggerShake();
+                let isCritFlavor = (dmg > getDmgEst(act) * 1.2); 
+                let flavor = getCombatFlavor('你', c.n, act, realDmg, isCritFlavor, false);
+                logMsg.push(`<div class="log-combat-h">${flavor}</div>`);
+
+                G.lastDmg = realDmg;            
+                triggerShake();
+            }
         }
-    }
 
     return false; // not fled
     };
@@ -3206,7 +3251,7 @@ function openModal(title, content, btns) {
     document.getElementById('m-btns').innerHTML = btns;
     document.getElementById('screen-modal').style.display = 'flex';
 }
-function closeModal() { document.getElementById('screen-modal').style.display = 'none'; }
+function closeModal() { document.getElementById('screen-modal').style.display = 'none'; showGameContainer(); }
 function log(t, m, c='') {
     let d = document.getElementById('log-area');
     d.innerHTML += `<div class="log-entry"><span style="color:#666">[D${G.day}]</span> [${t}] <span class="${c}">${m}</span></div>`;
@@ -4386,6 +4431,16 @@ function getDynamicEnemyStats(type) {
         variance = 1.0; 
     }
 
+     // --- ★★★ 修改開始：階梯式難度係數 (Time Scaling) ★★★ ---
+    let timeScale = 1.0;
+    if (G.day <= 30) {
+        timeScale = 0.6; // 新手保護期：怪物強度 60%
+    } else if (G.day <= 60) {
+        timeScale = 0.8; // 過渡期：怪物強度 80% (避免斷層)
+    }
+    // Day 60+ 恢復 100% 強度
+    // -----------------------------------------------------
+    
     let hpMult = 1.0;
     let atkMult = 1.0;
 
@@ -4400,8 +4455,13 @@ function getDynamicEnemyStats(type) {
     let adjustedAtk = p.atk * scalingFactor;
     adjustedAtk += (G.day * 2.5); 
 
-    let eHP = Math.floor(adjustedAtk * target.playerTurns * hpMult * variance);
-
+    // Day 30 前降低天數成長幅度，避免成長太快
+    let dayGrowth = (G.day <= 30) ? (G.day * 1.5) : (G.day * 2.5);
+    adjustedAtk += dayGrowth; 
+    
+     // 應用 timeScale
+    let eHP = Math.floor(adjustedAtk * target.playerTurns * hpMult * variance * timeScale);
+    
     // 計算敵人攻擊力
     let requiredNetDmg = p.hp / target.enemyTurns;
     
@@ -4411,13 +4471,13 @@ function getDynamicEnemyStats(type) {
     let effectiveReduc = Math.max(0.1, 1 - p.reduc); 
     let rawDmgNeeded = requiredNetDmg / effectiveReduc;
     
-    let eAtk = Math.floor((rawDmgNeeded + p.def) * atkMult * variance);
+    let eAtk = Math.floor((rawDmgNeeded + p.def) * atkMult * variance * timeScale);
 
-    // 天數保底
+    // 天數保底 (同樣應用 timeScale)
     let dayScale = 1 + (G.day * 0.15); 
-    let minHP = 40 * dayScale;
-    let minAtk = 10 + (G.day * 0.7);
-
+    let minHP = 40 * dayScale * timeScale;
+    let minAtk = 10 + (G.day * 0.7) * timeScale;
+    
     if (type === 'boss' || type === 'elite') { minHP *= 4.5; minAtk *= 1.6; }
     if (type === 'final_boss') { minHP = 12000; minAtk = 280; } 
 

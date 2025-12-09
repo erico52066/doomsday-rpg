@@ -105,7 +105,12 @@
   "actuary_06_calc": { "n": "精算模型", "desc": "多重效果。", "cd": 8, "cost": { "san": 10 }, "scale": { "i": 2.0 }, "effects": [ { "t": "shield", "v": 30 }, { "t": "buff", "k": "dodgeUp", "v": 3 } ], "log": "模型運行完美。" },
   "actuary_07_event": { "n": "黑天鵝事件", "desc": "極小機率的毀滅打擊。", "cd": 99, "cost": { "san": 50 }, "scale": { "i": 10.0 }, "effects": [ { "t": "dmg" } ], "log": "這是統計學上的不可能！" },
 
-  "teacher_01_rule": { "n": "教鞭", "desc": "物理傷害。", "cd": 2, "cost": {}, "scale": { "s": 1.2 }, "effects": [ { "t": "dmg" } ], "log": "手伸出來！" },
+  "teacher_01_rule": { 
+      "n": "教鞭", "desc": "造成傷害並稍微降低敵攻。", "cd": 3, "cost": {}, 
+      "scale": { "s": 1.3 }, 
+      "effects": [ { "t": "dmg" }, { "t": "debuff", "k": "atkDown", "v": 1 } ], 
+      "log": "手伸出來！" 
+  },
   "teacher_02_silent": { "n": "安靜", "desc": "敵人降攻。", "cd": 4, "cost": { "san": 2 }, "scale": {}, "effects": [ { "t": "debuff", "k": "atkDown", "v": 2 } ], "log": "全班安靜！" },
   "teacher_03_care": { "n": "關愛", "desc": "恢復SAN值。", "cd": 5, "cost": {}, "scale": { "w": 2.0 }, "effects": [ { "t": "heal_san", "v": 20 } ], "log": "沒事的，老師在。" },
   "teacher_04_protect": { "n": "守護", "desc": "獲得護盾。", "cd": 5, "cost": { "hp": 5 }, "scale": { "w": 3.0 }, "effects": [ { "t": "shield", "v": 50 } ], "log": "不准欺負我學生！" },
@@ -129,7 +134,12 @@
   "darts_06_rapid": { "n": "連射", "desc": "三連擊。", "cd": 6, "cost": { "food": 5 }, "scale": { "a": 1.0 }, "effects": [ { "t": "dmg_multi", "hits": 3 } ], "log": "手速極快。" },
   "darts_07_champ": { "n": "世界冠軍", "desc": "必殺一擊。", "cd": 50, "cost": { "san": 10 }, "scale": { "a": 6.0, "luck": 4.0 }, "effects": [ { "t": "dmg" } ], "log": "這就是冠軍的實力！" },
 
-  "gym_01_punch": { "n": "刺拳", "desc": "快速攻擊。", "cd": 2, "cost": {}, "scale": { "s": 1.2, "a": 1.2 }, "effects": [ { "t": "dmg" } ], "log": "噓！" },
+  "gym_01_punch": { 
+      "n": "刺拳", "desc": "快速攻擊造成傷害。", "cd": 2, "cost": {}, 
+      "scale": { "s": 1.5, "a": 1.2 }, 
+      "effects": [ { "t": "dmg" } ], 
+      "log": "噓！" 
+  },
   "gym_02_protein": { 
       "n": "蛋白粉", "desc": "提升攻擊力。", "cd": 5, "cost": { "water": 5 }, 
       "scale": {}, 
@@ -200,7 +210,14 @@
   "sage_06_rain": { "n": "大撒幣", "desc": "金錢風暴。", "cd": 10, "cost": { "money": 100 }, "scale": { "fixed": 150 }, "effects": [ { "t": "dmg" } ], "log": "有錢真係大曬。" },
   "sage_07_bankrupt": { "n": "破產令", "desc": "強制斬殺。", "cd": 99, "cost": { "money": 500 }, "scale": { "i": 5.0 }, "effects": [ { "t": "execute", "limit": 0.5 } ], "log": "資產清算。" },
 
-  "kim_01_build": { "n": "搭棚", "desc": "防禦提升。", "cd": 4, "cost": {}, "scale": {}, "effects": [ { "t": "buff", "k": "defUp", "v": 3 } ], "log": "安全第一。" },
+  "kim_01_build": { 
+      "n": "搭棚", 
+      "desc": "安全第一！獲得基於智力的護盾。", 
+      "cd": 4, "cost": {}, 
+      "scale": { "i": 2.0 }, 
+      "effects": [ { "t": "shield", "v": 20 } ], 
+      "log": "搭建防護網。" 
+  },
   "kim_02_sale": { "n": "推銷", "desc": "敵人暈眩。", "cd": 5, "cost": { "san": 2 }, "scale": { "i": 1.5 }, "effects": [ { "t": "stun", "v": 1 } ], "log": "這樓盤升值潛力好大。" },
   "kim_03_rent": { "n": "收租", "desc": "吸血。", "cd": 4, "cost": {}, "scale": { "i": 2.0 }, "effects": [ { "t": "heal_hp", "v": 20 } ], "log": "準時交租。" },
   "kim_04_plan": { "n": "規劃", "desc": "提升命中。", "cd": 5, "cost": {}, "scale": {}, "effects": [ { "t": "buff", "k": "accUp", "v": 5 } ], "log": "藍圖畫好了。" },
