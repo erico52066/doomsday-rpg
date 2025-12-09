@@ -2542,55 +2542,63 @@ function combatRound(act) {
                 logMsg.push(`🛡️ 無視防禦！`);
             }
         }
-
-    // === 4. 最終傷害扣除 ===
-    if (dmg > 0) {
-        // 扣除防禦
-        let eDef = Math.floor(c.maxHp * 0.05);
-        if (c.buffs.defDown) eDef = Math.floor(eDef * 0.5);
-        if (c.buffs.ignoreDef) eDef = 0;
-
-        let realDmg = Math.max(1, Math.floor(dmg - eDef));
-
-        // ★★★ 新增：敵人詞綴減傷 (defP) ★★★
-        if (c.defP > 0 && !c.buffs.ignoreDef) {
-            realDmg = Math.floor(realDmg * (1 - c.defP));
-        }
-
-        // 護盾抵扣
-        if (c.enemyShield > 0) {
-            if (c.enemyShield >= realDmg) {
-                c.enemyShield -= realDmg; realDmg = 0; logMsg.push("🛡️ 傷害被護盾抵擋");
-            } else {
-                realDmg -= c.enemyShield; c.enemyShield = 0; logMsg.push("⚡ 擊破護盾！");
-            }
-        }
-
-
-
-        // 扣血
-        if (realDmg > 0) {
-            c.hp -= realDmg;
-            logMsg.push(`💥 造成 <strong>${realDmg}</strong> 點傷害`);
+	 
+// === 4. 最終傷害扣除 (含平衡修正) ===
+        if (dmg > 0) {
+            // 讀取固定防禦力
+            let eDef = c.def || 0;
             
-             // ★★★ 新增：敵人詞綴反傷 (Thorns) ★★★
-            if (c.prefixEff === 'thorns' || c.prefixEff === 'thorns_light' || c.prefixEff === 'thorns_heavy') {
-                let rate = (c.prefixEff==='thorns_heavy') ? 0.4 : (c.prefixEff==='thorns') ? 0.2 : 0.1;
-                let thornsDmg = Math.floor(realDmg * rate);
-                if (thornsDmg > 0) {
-                    G.hp -= thornsDmg;
-                    logMsg.push(`<span style="color:#f44">⚡ 受到反傷 -${thornsDmg}</span>`);
+            // 應用 Debuff
+            if (c.buffs.defDown) eDef = Math.floor(eDef * 0.5);
+            if (c.buffs.ignoreDef) eDef = 0;
+
+            // 計算減傷後傷害
+            let reducedDmg = dmg - eDef;
+            
+            // ★★★ 核心修正：最小傷害機制 (10% 面板傷害) ★★★
+            // 確保即使不破防，也能造成 10% 的傷害，避免絕望感
+            let minDmg = Math.floor(dmg * 0.1); 
+            let realDmg = Math.max(minDmg, reducedDmg);
+            realDmg = Math.max(1, Math.floor(realDmg)); // 保底 1 點
+            // ==========================================
+
+            // 詞綴減傷 (百分比)
+            if (c.defP > 0 && !c.buffs.ignoreDef) {
+                realDmg = Math.floor(realDmg * (1 - c.defP));
+            }
+
+            // 護盾抵扣 (保持不變)
+            if (c.enemyShield > 0) {
+                if (c.enemyShield >= realDmg) {
+                    c.enemyShield -= realDmg; realDmg = 0; logMsg.push("🛡️ 傷害被護盾抵擋");
+                } else {
+                    realDmg -= c.enemyShield; c.enemyShield = 0; logMsg.push("⚡ 擊破護盾！");
                 }
             }
 
-            let isCrit = (dmg > getDmgEst(act) * 1.2); 
-            let flavor = getCombatFlavor('你', c.n, act, realDmg, isCrit, false);
-            logMsg.push(`<div class="log-combat-h">${flavor}</div>`);
+            // 執行扣血
+            if (realDmg > 0) {
+                c.hp -= realDmg;
+                logMsg.push(`💥 造成 <strong>${realDmg}</strong> 點傷害`);
+                
+                // ... (反傷與日誌代碼保持不變) ...
+                if (c.prefixEff === 'thorns' || c.prefixEff === 'thorns_light' || c.prefixEff === 'thorns_heavy') {
+                    let rate = (c.prefixEff==='thorns_heavy') ? 0.4 : (c.prefixEff==='thorns') ? 0.2 : 0.1;
+                    let thornsDmg = Math.floor(realDmg * rate);
+                    if (thornsDmg > 0) {
+                        G.hp -= thornsDmg;
+                        logMsg.push(`<span style="color:#f44">⚡ 受到反傷 -${thornsDmg}</span>`);
+                    }
+                }
 
-            G.lastDmg = realDmg;            
-            triggerShake();
+                let isCritFlavor = (dmg > getDmgEst(act) * 1.2); 
+                let flavor = getCombatFlavor('你', c.n, act, realDmg, isCritFlavor, false);
+                logMsg.push(`<div class="log-combat-h">${flavor}</div>`);
+
+                G.lastDmg = realDmg;            
+                triggerShake();
+            }
         }
-    }
 
     return false; // not fled
     };
