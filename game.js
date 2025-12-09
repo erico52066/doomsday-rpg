@@ -2522,7 +2522,7 @@ function combatRound(act) {
     } else if (act === 'defend') {
         G.isDefending = true; G.playerDefCD = 3; logMsg.push("🛡️ 防禦姿態");
     } else if (act === 'flee') {
-        if (Math.random() < 0.5) { campPhase(); return; }
+        if (Math.random() < 0.5) { campPhase(); return true; }
         logMsg.push("🏃 逃跑失敗");
     }
 
