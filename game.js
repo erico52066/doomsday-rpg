@@ -1803,8 +1803,9 @@ function renderCombat() {
 
 // --- 修改開始：計算基礎值與當前值，並生成差異顯示 ---
     
-    // 1. 防禦力 (Base: MaxHP * 5%)
-    let baseDef = Math.floor(c.maxHp * 0.05);
+    // --- 修改：讀取固定防禦力 ---
+    // 1. 防禦力 (Base: c.def)
+    let baseDef = c.def || 0; // 讀取 G.combat.def
     let curDef = baseDef;
     if(c.buffs.defDown) curDef = Math.floor(curDef * 0.5);
     if(c.buffs.defUp) curDef = Math.floor(curDef * 1.5);
