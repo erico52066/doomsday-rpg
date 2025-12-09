@@ -1467,7 +1467,6 @@ function abandonQuest() {
 
 // ==================== 戰鬥與物品 ====================
 function triggerBossFight(name, isQuest=false) { 
-function triggerBossFight(name, isQuest=false) { 
     // 使用動態計算
     let typeKey = (name === "最終屍王") ? 'final_boss' : 'boss';
     let stats = getDynamicEnemyStats(typeKey);
