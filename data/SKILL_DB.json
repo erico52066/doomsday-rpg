@@ -20,7 +20,12 @@
   "esport_06_flash": { "n": "閃現 (Flash)", "desc": "完全迴避傷害。", "cd": 10, "cost": { "san": 15 }, "scale": { "w": 2.0 }, "effects": [ { "t": "shield", "v": 100 } ], "log": "交閃不殺！" },
   "esport_07_faker": { "n": "魔王降臨", "desc": "多段高傷。", "cd": 20, "cost": { "hp": 20 }, "scale": { "a": 1.0 }, "effects": [ { "t": "dmg_multi", "hits": 5 } ], "log": "Look at the cleanse! Look at the moves!" },
 
-  "nurse_01_bandage": { "n": "戰地包紮", "desc": "快速止血。", "cd": 4, "cost": {}, "scale": { "i": 1.5 }, "effects": [ { "t": "heal_hp", "v": 20 } ], "log": "熟練地包紮傷口。" },
+  "nurse_01_bandage": { 
+      "n": "奪命手術刀", "desc": "精準切割敵人並順手包紮自己。", "cd": 3, "cost": {}, 
+      "scale": { "i": 1.2, "s": 0.5 }, 
+      "effects": [ { "t": "dmg" }, { "t": "heal_hp", "v": 15 } ], 
+      "log": "這是治療的一部分！(物理)" 
+  },
   "nurse_02_sedative": { "n": "鎮靜劑", "desc": "恢復SAN值。", "cd": 6, "cost": { "action": 1 }, "scale": { "i": 2.0 }, "effects": [ { "t": "heal_san", "v": 15 } ], "log": "沒事了，深呼吸。" },
   "nurse_03_needle": { "n": "巨型針筒", "desc": "造成流血。", "cd": 3, "cost": {}, "scale": { "s": 1.5 }, "effects": [ { "t": "debuff", "k": "bleed", "v": 3 }, { "t": "dmg" } ], "log": "這針可能會有點痛..." },
   "nurse_04_triage": { "n": "檢傷分類", "desc": "找出弱點，降防。", "cd": 5, "cost": { "san": 5 }, "scale": {}, "effects": [ { "t": "debuff", "k": "defDown", "v": 3 } ], "log": "這個沒救了，下一個。" },
@@ -45,10 +50,10 @@
   "mech_07_gundam": { "n": "高達出擊", "desc": "無視防禦超高傷。", "cd": 50, "cost": { "money": 200 }, "scale": { "i": 8.0 }, "effects": [ { "t": "dmg" }, { "t": "true_dmg_day", "factor": 8 } ], "log": "阿姆羅，出擊！" },
 
  "banker_01_calc": { 
-      "n": "精算", "desc": "造成傷害，下一次攻擊必定命中。", "cd": 3, "cost": { "san": 2 }, 
+      "n": "Algo打擊", "desc": "計算弱點造成傷害，下一次攻擊也必定命中。", "cd": 3, "cost": { "san": 2 }, 
       "scale": { "i": 1.5 }, 
       "effects": [ { "t": "dmg" }, { "t": "buff", "k": "accUp", "v": 5 } ], 
-      "log": "一切都在計算之中。" 
+      "log": "It's all about Quantitative Trading." 
   },
   "banker_02_bribe": { "n": "賄賂", "desc": "敵人暈眩。", "cd": 6, "cost": { "money": 20 }, "scale": {}, "effects": [ { "t": "stun", "v": 1 } ], "log": "拿去飲茶。" },
   "banker_03_hedge": { "n": "風險對沖", "desc": "獲得護盾。", "cd": 5, "cost": { "san": 5 }, "scale": { "i": 2.0 }, "effects": [ { "t": "shield", "v": 40 } ], "log": "分散投資風險。" },
@@ -65,7 +70,12 @@
   "panda_06_rush": { "n": "單王衝刺", "desc": "三連擊。", "cd": 8, "cost": { "food": 10, "water": 10 }, "scale": { "a": 1.0 }, "effects": [ { "t": "dmg_multi", "hits": 3 } ], "log": "這一單不能遲！" },
   "panda_07_keeta": { "n": "Keeta衝擊", "desc": "召喚競爭對手夾擊。", "cd": 30, "cost": { "money": 20 }, "scale": { "a": 5.0 }, "effects": [ { "t": "dmg" }, { "t": "stun", "v": 2 } ], "log": "兩大平台聯手！" },
 
-  "photo_01_flash": { "n": "閃光燈", "desc": "致盲敵人。", "cd": 4, "cost": {}, "scale": { "i": 1.0 }, "effects": [ { "t": "debuff", "k": "blind", "v": 2 } ], "log": "看這裡！" },
+  "photo_01_flash": { 
+      "n": "閃光過曝", "desc": "造成光熱傷害並致盲敵人。", "cd": 3, "cost": {}, 
+      "scale": { "i": 1.3 }, 
+      "effects": [ { "t": "dmg" }, { "t": "debuff", "k": "blind", "v": 2 } ], 
+      "log": "近距離高熱閃光！" 
+  },
   "photo_02_zoom": { "n": "長焦鎖定", "desc": "提升命中。", "cd": 5, "cost": {}, "scale": {}, "effects": [ { "t": "buff", "k": "accUp", "v": 5 } ], "log": "對焦完成。" },
   "photo_03_tripod": { "n": "腳架重擊", "desc": "物理傷害。", "cd": 3, "cost": {}, "scale": { "s": 1.5 }, "effects": [ { "t": "dmg" } ], "log": "碳纖維很硬的。" },
   "photo_04_macro": { "n": "微距觀察", "desc": "找出弱點降防。", "cd": 5, "cost": { "san": 2 }, "scale": {}, "effects": [ { "t": "debuff", "k": "defDown", "v": 3 } ], "log": "毛孔都看得見。" },
@@ -152,7 +162,12 @@
   "gym_06_roid": { "n": "類固醇", "desc": "爆發性強化但扣血。", "cd": 10, "cost": { "hp": 20 }, "scale": {}, "effects": [ { "t": "buff", "k": "atkUp", "v": 8 } ], "log": "肌肉充血！" },
   "gym_07_monster": { "n": "背肌鬼面", "desc": "怪獸般的連擊。", "cd": 40, "cost": { "food": 30 }, "scale": { "s": 5.0 }, "effects": [ { "t": "dmg_multi", "hits": 5 } ], "log": "看這完美的倒三角！" },
 
-  "psy_01_calm": { "n": "冷靜", "desc": "恢復SAN。", "cd": 4, "cost": {}, "scale": { "w": 1.5 }, "effects": [ { "t": "heal_san", "v": 15 } ], "log": "深呼吸。" },
+  "psy_01_calm": { 
+      "n": "休克療法", "desc": "物理性恢復SAN並造成傷害。", "cd": 4, "cost": {}, 
+      "scale": { "i": 1.2, "w": 0.5 }, 
+      "effects": [ { "t": "dmg" }, { "t": "heal_san", "v": 10 } ], 
+      "log": "冷靜下來吧！" 
+  },
   "psy_02_hypno": { "n": "催眠", "desc": "睡眠。", "cd": 6, "cost": { "san": 5 }, "scale": { "i": 2.0 }, "effects": [ { "t": "debuff", "k": "sleep", "v": 2 } ], "log": "眼皮變重了..." },
   "psy_03_analyze": { "n": "心理分析", "desc": "降防。", "cd": 4, "cost": {}, "scale": {}, "effects": [ { "t": "debuff", "k": "defDown", "v": 3 } ], "log": "童年陰影是吧？" },
   "psy_04_stress": { "n": "壓力釋放", "desc": "精神衝擊傷害。", "cd": 5, "cost": { "san": 10 }, "scale": { "i": 2.5 }, "effects": [ { "t": "dmg" } ], "log": "情緒崩潰！" },
@@ -164,7 +179,7 @@
       "n": "修剪", "desc": "造成傷害並流血。", "cd": 2, "cost": {}, 
       "scale": { "a": 1.3 }, 
       "effects": [ { "t": "dmg" }, { "t": "debuff", "k": "bleed", "v": 2 } ], 
-      "log": "剪掉多餘的部分。" 
+      "log": "剪不斷, 理還亂.。" 
   },
    "hair_02_spray": { "n": "定型噴霧", "desc": "致盲。", "cd": 5, "cost": {}, "scale": {}, "effects": [ { "t": "debuff", "k": "blind", "v": 2 } ], "log": "噴到眼睛了！" },
   "hair_03_style": { "n": "造型", "desc": "提升閃避。", "cd": 4, "cost": { "san": 2 }, "scale": {}, "effects": [ { "t": "buff", "k": "dodgeUp", "v": 3 } ], "log": "要靚仔。" },
@@ -194,7 +209,12 @@
   "math_06_infinity": { "n": "無限", "desc": "持續回血。", "cd": 10, "cost": { "san": 15 }, "scale": { "i": 1.0 }, "effects": [ { "t": "heal_hp", "v": 50 } ], "log": "∞" },
   "math_07_solve": { "n": "無解證明", "desc": "邏輯崩潰傷害。", "cd": 60, "cost": { "san": 30 }, "scale": { "i": 8.0 }, "effects": [ { "t": "true_dmg_day", "factor": 8 } ], "log": "Q.E.D." },
 
-  "kid_01_bb": { "n": "BB彈", "desc": "微量傷害。", "cd": 1, "cost": {}, "scale": { "a": 1.0 }, "effects": [ { "t": "dmg" } ], "log": "biu biu biu!" },
+  "kid_01_bb": { 
+      "n": "BB彈連射", "desc": "精準的玩具槍射擊。", "cd": 2, "cost": {}, 
+      "scale": { "a": 1.4, "luck": 0.5 }, 
+      "effects": [ { "t": "dmg" }, { "t": "buff", "k": "accUp", "v": 5 } ], 
+      "log": "biu biu biu! 全部命中！" 
+  },
   "kid_02_cry": { "n": "爆喊", "desc": "敵人降攻。", "cd": 4, "cost": {}, "scale": {}, "effects": [ { "t": "debuff", "k": "atkDown", "v": 3 } ], "log": "嗚哇~~~~！" },
   "kid_03_run": { "n": "放學", "desc": "提升閃避。", "cd": 5, "cost": { "food": 5 }, "scale": {}, "effects": [ { "t": "buff", "k": "dodgeUp", "v": 5 } ], "log": "第一名衝出校門！" },
   "kid_04_snack": { "n": "食薯片", "desc": "恢復HP。", "cd": 3, "cost": { "food": 2 }, "scale": {}, "effects": [ { "t": "heal_hp", "v": 20 } ], "log": "熱浪好食。" },
@@ -202,7 +222,12 @@
   "kid_06_friends": { "n": "叫朋友", "desc": "多重攻擊。", "cd": 8, "cost": { "food": 10 }, "scale": { "a": 1.0 }, "effects": [ { "t": "dmg_multi", "hits": 5 } ], "log": "我有好多兄弟！" },
   "kid_07_adult": { "n": "小大人", "desc": "覺醒一擊。", "cd": 50, "cost": { "san": 50 }, "scale": { "s": 5.0, "a": 5.0 }, "effects": [ { "t": "dmg" } ], "log": "我唔係細路仔！" },
 
-  "sage_01_bribe": { "n": "派錢", "desc": "敵人遲疑(降攻)。", "cd": 3, "cost": { "money": 10 }, "scale": {}, "effects": [ { "t": "debuff", "k": "atkDown", "v": 2 } ], "log": "拿去飲茶。" },
+  "sage_01_bribe": { 
+      "n": "金錢誘惑", "desc": "用錢砸人造成傷害並使敵降攻。", "cd": 3, "cost": { "money": 5 }, 
+      "scale": { "i": 1.0, "luck": 1.0 }, 
+      "effects": [ { "t": "dmg" }, { "t": "debuff", "k": "atkDown", "v": 3 } ], 
+      "log": "有錢使得鬼推磨。" 
+  },
   "sage_02_guard": { "n": "保鏢", "desc": "召喚護盾。", "cd": 5, "cost": { "money": 20 }, "scale": {}, "effects": [ { "t": "shield", "v": 50 } ], "log": "阿強，擋住！" },
   "sage_03_loan": { "n": "放數", "desc": "延遲傷害。", "cd": 4, "cost": {}, "scale": { "i": 2.0 }, "effects": [ { "t": "debuff", "k": "bleed", "v": 3 } ], "log": "九出十三歸。" },
   "sage_04_call": { "n": "收數", "desc": "高傷害。", "cd": 5, "cost": { "san": 5 }, "scale": { "s": 2.5 }, "effects": [ { "t": "dmg" } ], "log": "還錢！" },
@@ -211,12 +236,11 @@
   "sage_07_bankrupt": { "n": "破產令", "desc": "強制斬殺。", "cd": 99, "cost": { "money": 500 }, "scale": { "i": 5.0 }, "effects": [ { "t": "execute", "limit": 0.5 } ], "log": "資產清算。" },
 
   "kim_01_build": { 
-      "n": "搭棚", 
-      "desc": "安全第一！獲得基於智力的護盾。", 
-      "cd": 4, "cost": {}, 
-      "scale": { "i": 2.0 }, 
-      "effects": [ { "t": "shield", "v": 20 } ], 
-      "log": "搭建防護網。" 
+      "n": "強制收樓", 
+      "desc": "對敵人造成傷害並獲得護盾。", "cd": 4, "cost": {}, 
+      "scale": { "s": 1.2, "i": 1.0 }, 
+      "effects": [ { "t": "dmg" }, { "t": "shield", "v": 15 } ], 
+      "log": "這棟樓要拆了，滾開！" 
   },
   "kim_02_sale": { "n": "推銷", "desc": "敵人暈眩。", "cd": 5, "cost": { "san": 2 }, "scale": { "i": 1.5 }, "effects": [ { "t": "stun", "v": 1 } ], "log": "這樓盤升值潛力好大。" },
   "kim_03_rent": { "n": "收租", "desc": "吸血。", "cd": 4, "cost": {}, "scale": { "i": 2.0 }, "effects": [ { "t": "heal_hp", "v": 20 } ], "log": "準時交租。" },
@@ -225,7 +249,12 @@
   "kim_06_monopoly": { "n": "地產霸權", "desc": "壓制傷害。", "cd": 8, "cost": { "san": 10 }, "scale": { "s": 3.0 }, "effects": [ { "t": "dmg" }, { "t": "debuff", "k": "atkDown", "v": 3 } ], "log": "成個商場都係我嘅。" },
   "kim_07_redevelop": { "n": "強拍重建", "desc": "毀滅性打擊。", "cd": 60, "cost": { "money": 200 }, "scale": { "s": 6.0 }, "effects": [ { "t": "true_dmg_day", "factor": 10 } ], "log": "這棟樓要拆！" },
 
-  "yolo_01_steer": { "n": "切線", "desc": "提升閃避。", "cd": 3, "cost": {}, "scale": {}, "effects": [ { "t": "buff", "k": "dodgeUp", "v": 3 } ], "log": "過彎！" },
+  "yolo_01_steer": { 
+      "n": "高速擦撞", "desc": "衝撞敵人造成傷害，並提升閃避。", "cd": 3, "cost": {}, 
+      "scale": { "s": 1.0, "a": 1.2 }, 
+      "effects": [ { "t": "dmg" }, { "t": "buff", "k": "dodgeUp", "v": 2 } ], 
+      "log": "利用慣性撞擊後拉開距離！" 
+  },
   "yolo_02_gas": { "n": "油門", "desc": "提升攻擊。", "cd": 4, "cost": { "food": 5 }, "scale": {}, "effects": [ { "t": "buff", "k": "atkUp", "v": 3 } ], "log": "地板油！" },
   "yolo_03_crash": { "n": "碰撞", "desc": "物理傷害。", "cd": 2, "cost": { "hp": 5 }, "scale": { "s": 2.0 }, "effects": [ { "t": "dmg" } ], "log": "硬碰硬。" },
   "yolo_04_pit": { "n": "Pit Stop", "desc": "快速恢復。", "cd": 6, "cost": { "action": 1 }, "scale": {}, "effects": [ { "t": "heal_hp", "v": 30 }, { "t": "heal_san", "v": 10 } ], "log": "換胎，加油。" },
@@ -249,7 +278,12 @@
   "chef_06_michelin": { "n": "三星擺盤", "desc": "恢復SAN。", "cd": 8, "cost": { "food": 20 }, "scale": {}, "effects": [ { "t": "heal_san", "v": 40 } ], "log": "這是藝術品。" },
   "chef_07_feast": { "n": "滿漢全席", "desc": "飽食度換取極大增益。", "cd": 30, "cost": { "food": 100 }, "scale": {}, "effects": [ { "t": "heal_hp", "v": 200 }, { "t": "buff", "k": "atkUp", "v": 10 } ], "log": "食得是福。" },
 
-  "theo_01_pray": { "n": "祈禱", "desc": "恢復SAN。", "cd": 4, "cost": {}, "scale": { "w": 1.5 }, "effects": [ { "t": "heal_san", "v": 15 } ], "log": "阿門。" },
+  "theo_01_pray": { 
+      "n": "聖光打擊", "desc": "用物理手段傳教，恢復SAN值。", "cd": 4, "cost": {}, 
+      "scale": { "s": 1.0, "w": 1.0 }, 
+      "effects": [ { "t": "dmg" }, { "t": "heal_san", "v": 10 } ], 
+      "log": "用厚重的聖經砸了過去！阿門。" 
+  },
   "theo_02_smite": { "n": "懲戒", "desc": "神聖傷害。", "cd": 3, "cost": { "san": 5 }, "scale": { "w": 2.0 }, "effects": [ { "t": "dmg" } ], "log": "有罪！" },
   "theo_03_shield": { "n": "信仰之盾", "desc": "護盾。", "cd": 6, "cost": { "san": 5 }, "scale": { "w": 2.5 }, "effects": [ { "t": "shield", "v": 40 } ], "log": "神庇佑我。" },
   "theo_04_confess": { "n": "告解", "desc": "敵人降攻。", "cd": 5, "cost": {}, "scale": {}, "effects": [ { "t": "debuff", "k": "atkDown", "v": 3 } ], "log": "悔改吧。" },
@@ -258,11 +292,18 @@
   "theo_07_judge": { "n": "末日審判", "desc": "全屏真傷。", "cd": 60, "cost": { "san": 50 }, "scale": { "w": 8.0 }, "effects": [ { "t": "true_dmg_day", "factor": 12 } ], "log": "審判之時已到。" },
 
  "tao_01_charm": { 
-      "n": "貼符", "desc": "造成傷害並定身。", "cd": 4, "cost": { "san": 2 }, 
-      "scale": { "i": 1.2 }, 
-      "effects": [ { "t": "dmg" }, { "t": "stun", "v": 1 } ], 
-      "log": "急急如律令！" 
+      "n": "天師符", 
+      "desc": "定身敵人。若 3 回合後敵人仍存活，將被強制轉化為殭屍。", 
+      "cd": 5, 
+      "cost": { "san": 5 }, 
+      "scale": { "i": 1.0 }, 
+      "effects": [ 
+          { "t": "stun", "v": 1 },
+          { "t": "zombie_curse", "v": 3 } 
+      ], 
+      "log": "急急如律令！這張符咒封住了對方的氣脈..." 
   },
+
     "tao_02_sword": { "n": "桃木劍", "desc": "對靈體加成。", "cd": 2, "cost": {}, "scale": { "s": 1.3 }, "effects": [ { "t": "dmg" } ], "log": "斬妖！" },
   "tao_03_bell": { "n": "攝魂鈴", "desc": "干擾敵人。", "cd": 5, "cost": {}, "scale": {}, "effects": [ { "t": "debuff", "k": "accDown", "v": 3 } ], "log": "叮鈴鈴..." },
   "tao_04_blood": { "n": "黑狗血", "desc": "破防。", "cd": 6, "cost": { "hp": 5 }, "scale": {}, "effects": [ { "t": "debuff", "k": "defDown", "v": 4 } ], "log": "破邪！" },
@@ -305,4 +346,63 @@
   "fan_04_cd": { "n": "飛碟", "desc": "CD投擲。", "cd": 3, "cost": { "money": 5 }, "scale": { "a": 1.5 }, "effects": [ { "t": "dmg" } ], "log": "限量版CD！" },
   "fan_05_guard": { "n": "護主", "desc": "護盾。", "cd": 6, "cost": { "san": 5 }, "scale": { "w": 2.0 }, "effects": [ { "t": "shield", "v": 40 } ], "log": "誰敢動我的偶像！" },
   "fan_06_high": { "n": "高音", "desc": "無視防禦。", "cd": 8, "cost": { "food": 5 }, "scale": { "san": 2.0 }, "effects": [ { "t": "dmg" }, { "t": "stun", "v": 1 } ], "log": "高頻共振！" },
-  "fan_07_meet": { "n": "握手會", "desc": "幸福昇天(極大回血回SAN)。", "cd": 99, "cost": { "money": 200 }, "scale": { "fixed": 200 }, "effects": [ { "t": "heal_hp", "v": 200 }, { "t": "heal_san", "v": 100 } ], "log": "死而無憾了..." }}
+  "fan_07_meet": { "n": "握手會", "desc": "幸福昇天(極大回血回SAN)。", "cd": 99, "cost": { "money": 200 }, "scale": { "fixed": 200 }, "effects": [ { "t": "heal_hp", "v": 200 }, { "t": "heal_san", "v": 100 } ], "log": "死而無憾了..." },
+
+  "matthew_01_order": { 
+      "n": "大量訂購", 
+      "desc": "從Amazon隨機購入一種道具x隨機數量，造成傷害並附加特效。", 
+      "cd": 3, "cost": { "money": 5 }, 
+      "scale": { "luck": 1.0, "i": 1.0 }, 
+      "effects": [ { "t": "random_amazon" } ], 
+      "log": "正在生成訂單號..." 
+  },
+  "matthew_02_ha": { 
+      "n": "醫管局供應商", 
+      "desc": "動用供應鏈關係，獲得隨機醫療物資進行強化。", 
+      "cd": 5, "cost": { "san": 5 }, 
+      "scale": { "luck": 1.5 }, 
+      "effects": [ { "t": "random_medical" } ], 
+      "log": "緊急調用庫存..." 
+  },
+  "matthew_03_delay": { 
+      "n": "物流延誤", 
+      "desc": "因為海關扣查，敵人的行動被延遲了(暈眩/緩速)。", 
+      "cd": 6, "cost": { "san": 5 }, 
+      "scale": { "i": 1.5 }, 
+      "effects": [ { "t": "stun", "v": 1 }, { "t": "debuff", "k": "accDown", "v": 3 } ], 
+      "log": "「你的貨件現正被海關扣查...」敵人因物流延誤而崩潰了！" 
+  },
+  "matthew_04_bubble": { 
+      "n": "氣泡紙防禦", 
+      "desc": "用過度包裝保護自己(獲得護盾)。", 
+      "cd": 5, "cost": {}, 
+      "scale": { "i": 2.0 }, 
+      "effects": [ { "t": "shield", "v": 40 } ], 
+      "log": "「易碎品！小心輕放！」Matthew 發瘋似地往身上纏了二十層氣泡紙。" 
+  },
+  "matthew_05_scalper": { 
+      "n": "炒價", 
+      "desc": "將金錢轉化為攻擊力，對敵人造成精神與物理雙重打擊。", 
+      "cd": 4, "cost": { "money": 30 }, 
+      "scale": { "i": 2.5 }, 
+      "effects": [ { "t": "dmg" }, { "t": "heal_san", "v": 10 } ], 
+      "log": "「全港最後一轉貨喺我手！想要？」Matthew 以十倍炒價對敵人造成了精神打擊！" 
+  },
+  "matthew_06_prime": { 
+      "n": "Prime 會員", 
+      "desc": "次日達！大幅提升速度與閃避。", 
+      "cd": 8, "cost": { "money": 20 }, 
+      "scale": {}, 
+      "effects": [ { "t": "buff", "k": "dodgeUp", "v": 5 }, { "t": "buff", "k": "accUp", "v": 5 } ], 
+      "log": "「升級做 VVIP 會員啦！」Matthew 開啟了優先配送通道，速度暴增！" 
+  },
+  "matthew_07_container": { 
+      "n": "貨櫃重壓", 
+      "desc": "直接空投一個40呎貨櫃砸死敵人。", 
+      "cd": 60, "cost": { "money": 200 }, 
+      "scale": { "fixed": 0 }, 
+      "effects": [ { "t": "true_dmg_day", "factor": 15 } ], 
+      "log": "「收野啦你！！」一個40呎標準貨櫃從天而降，顯示為：免運費。" 
+  }
+
+}

@@ -125,7 +125,7 @@ const RPG_CLASSES = {
     'special': { 
         label: '🦄 特殊 (機制/運氣)', 
         color: '#ffd700',
-        jobs: ['機械師', '小學生', '莊家', '賭場荷官', '精算師', '園藝師', '追星族'] 
+        jobs: ['機械師', '小學生', '莊家', '賭場荷官', '精算師', '園藝師', '追星族', '電商大佬']
     }
 };
 
@@ -560,51 +560,70 @@ function openCampBag() {
         return;
     }
 
+    // 定義屬性名稱映射
+    const STAT_MAP_CN = {
+        s:'力量', a:'敏捷', i:'智力', w:'意志',
+        luck:'幸運', hp:'生命', san:'SAN',
+        crit:'暴擊', dodge:'閃避', defP:'減傷', acc:'命中',
+        heal:'回復'
+    };
+
     let html = `<div style="display:grid; gap:8px; max-height:60vh; overflow-y:auto;">`;
     G.bag.forEach((item, idx) => {
-        let effDesc = item.stats.eff ? ` (${item.stats.eff})` : '';
-        let valDesc = '';
+        let descriptions = [];
         
-         if(item.type === 'med') {
-            // 藥品顯示 HP/SAN
-            let parts = [];
-            if(item.stats.hp) parts.push(`HP+${item.stats.hp}`);
-            if(item.stats.san) parts.push(`SAN+${item.stats.san}`);
-            valDesc = parts.join(' ');
-        }
-        else if(item.type === 'food') {
-            valDesc = `飽食度 +${item.val}`;
-        }
-        else if(item.type === 'water') {
-            valDesc = `水分 +${item.val}`;
-        }
-        else if(item.type === 'throwable') {
-            valDesc = `造成傷害 ${item.val}`;
-        }
-        else {
-            // 裝備類：動態獲取標籤 (攻擊力/防禦力)
+        // 1. 顯示基礎數值
+        if(item.val > 0) {
             let lbl = getItemValueLabel(item.type);
-            // 去掉 Emoji 以保持背包排版簡潔 (可選，這裡我保留了標籤文字)
-            // 由於 getItemValueLabel 現在帶 Emoji，我們直接用
-            valDesc = `${lbl}: ${getEquipVal(item)}`; 
+            // 去掉 emoji 保持簡潔
+            lbl = lbl.replace(/[^\u4e00-\u9fa5]/g, ''); 
+            descriptions.push(`${lbl}+${getEquipVal(item)}`);
         }
-        // ========================================
+
+        // 2. 顯示所有詞綴屬性 (包含負面效果)
+        if(item.stats) {
+            for(let k in item.stats) {
+                if(k === 'desc' || k === 'eff' || k === 'all') continue;
+                let v = item.stats[k];
+                if(v === 0) continue;
+                let name = STAT_MAP_CN[k] || k;
+                let sign = v > 0 ? '+' : '';
+                
+                // ★★★ 新增：提示判定邏輯 ★★★
+                let hint = "";
+                // 條件：如果是消耗品 (med/food/water) 且 屬性是戰鬥數值 (s/a/i/w/crit/dodge/acc/defP)
+                // 注意：HP 和 SAN 不加提示，因為它們在營地也是立即生效的
+                if (['med', 'food', 'water'].includes(item.type) && ['s','a','i','w','crit','dodge','acc','defP'].includes(k)) {
+                    hint = `<span style="color:#fa0;font-size:0.8em;margin-left:2px">(戰鬥中使用才發動額外加成)</span>`;
+                }
+                    // ==========================================
+                // 處理百分比
+                if (['defP', 'dodge', 'crit', 'acc'].includes(k) || (Math.abs(v) < 1 && v !== 0)) {
+                    descriptions.push(`${name}${sign}${Math.floor(v*100)}%`);
+                } else {
+                    descriptions.push(`${name}${sign}${v}`);
+                }
+            }
+        }
+
+        // 3. 顯示特殊描述
+        if(item.stats && item.stats.desc) descriptions.push(`"${item.stats.desc}"`);
+        if(item.stats && item.stats.eff) descriptions.push(`特效:${item.stats.eff}`);
+
+        let valDesc = descriptions.join(' | ');
 
         let actionBtn = '';
-       // 1. 消耗品 -> 使用
         if(item.type === 'med' || item.type === 'food' || item.type === 'water') {
             actionBtn = `<button onclick="useCampItem(${idx})" style="width:auto; padding:4px 10px; background:#254; border-color:#4f4">使用</button>`;
         }
-        // 2. 裝備類 -> 裝備 (新增)
         else if (['melee', 'ranged', 'head', 'body', 'acc', 'shoes'].includes(item.type)) {
             actionBtn = `<button onclick="equipFromBag(${idx})" style="width:auto; padding:4px 10px; background:#245; border-color:#48f">裝備</button>`;
         }
         
         html += `<div style="background:#222; padding:8px; border:1px solid #444; display:flex; justify-content:space-between; align-items:center;">
-            <div style="text-align:left">
+            <div style="text-align:left; width:70%">
                 <div>${getItemTypeTag(item.type)} <span class="q${item.rarity}" style="font-weight:bold">${item.fullName}</span></div>
-                <div style="font-size:0.8em; color:#ddd; margin-top:2px">${valDesc} ${effDesc}</div>
-                <div style="font-size:0.75em; color:#888">${item.stats.desc || ''}</div>
+                <div style="font-size:0.8em; color:#bbb; margin-top:2px; line-height:1.4;">${valDesc}</div>
             </div>
             <div style="display:flex; gap:5px;">
                 ${actionBtn}
@@ -619,28 +638,21 @@ function openCampBag() {
     </div>`;
     openModal("🎒 營地背包", html, `<button onclick="closeModal()">關閉</button>`);
 }
+
 function useCampItem(idx) {
     let item = G.bag[idx];
     let used = false;
     let msg = "";
 
-	// --- 新增：食物使用邏輯 ---
     if(item.type === 'food' || item.type === 'water') {
         let val = item.val;
-        if(item.type === 'food') {
-            G.food += val;
-            msg = `飽食度 +${val}`;
-        } else {
-            G.water += val;
-            msg = `水分 +${val}`;
-        }
+        if(item.type === 'food') { G.food += val; msg = `飽食度 +${val}`; } 
+        else { G.water += val; msg = `水分 +${val}`; }
         used = true;
         log('營地', `使用了 ${item.fullName}: ${msg}`, 'c-gain');
     }
-    // --- 新增結束 --
 
     if(item.type === 'med') {
-        // 恢復邏輯
         let healed = false;
         if(item.stats.hp && G.hp < G.maxHp) {
             let oldHp = G.hp;
@@ -654,33 +666,39 @@ function useCampItem(idx) {
             msg += `SAN值恢復 ${G.san - oldSan}. `;
             healed = true;
         }
+        // 如果有屬性buff，雖然營地使用只能暫時沒效果，但也算使用成功
+        if(item.stats.s || item.stats.i || item.stats.a || item.stats.w || item.stats.crit) {
+             msg += `(屬性變化僅在戰鬥中生效) `;
+             healed = true; 
+        }
 
-        if(!healed && !item.stats.s && !item.stats.a) {
-            // 如果滿血且藥物只有恢復功能
+        if(!healed) {
             if(!confirm("狀態已滿，確定要浪費藥品嗎？")) return;
         }
-        
         used = true;
         log('營地', `使用了 ${item.fullName}: ${msg}`, 'c-gain');
     }
 
     if(used) {
-        G.bag.splice(idx, 1); // 移除物品
-        updateUI(); // 更新血條
-        openCampBag(); // 重新打開背包刷新列表
+        G.bag.splice(idx, 1); 
+        updateUI(); 
+        renderCampActions(); // ★★★ 修復：強制刷新營地按鈕狀態 (1/5) ★★★
+        openCampBag(); 
     }
 }
-
-function discardCampItem(idx) {
+	
+    function discardCampItem(idx) {
     let item = G.bag[idx];
     if(confirm(`確定要丟棄 ${item.fullName} 嗎？此操作無法撤銷。`)) {
         G.bag.splice(idx, 1);
         log('營地', `丟棄了 ${item.fullName}`, 'c-loss');
-        openCampBag(); // 刷新列表
-        updateUI(); // 更新UI (如果是裝備按鈕上的狀態)
+        
+        updateUI(); 
+        renderCampActions(); // 更新外面按鈕的 (數量/上限)
+        openCampBag(); // 重新整理背包清單
     }
 }
-	
+
 	// ==========================================
 // ★★★ 請在這裡插入 equipFromBag 函數 ★★★
 // ==========================================
@@ -773,11 +791,17 @@ function startEpicStory() {
     if (G.activeQuest) {
         let q = G.activeQuest;
         isQuestStory = true;
+        let bossName = '區域領主';
         
+        // 1. 確定 Boss 名稱與情境
+    if (G.activeQuest) {
+        let q = G.activeQuest;
+        isQuestStory = true;
+        bossName = q.boss;
         storyData = {
             title: `⚔️ 任務決戰：${q.loc}`,
-            intro: `你依照情報來到了 <strong>${q.loc}</strong>。<br>這裡的空氣中瀰漫著令人作嘔的氣息，${q.boss} 就在深處等著你。`,
-            steps: [
+            intro: `你依照情報來到了 <strong>${q.loc}</strong>。<br>空氣中瀰漫著令人作嘔的氣息，${q.boss} 就在深處。`,
+             steps: [
                 {q:"外圍充滿了警戒的變異生物。", opts: [{t:"潛伏穿過", type:'good', stat:'a'}, {t:"強行突破", type:'bad', stat:'s'}]},
                 {q:"你發現了大門的電子鎖被破壞了。", opts: [{t:"修復電路", type:'good', stat:'i'}, {t:"尋找通風口", type:'bad', stat:'luck'}]},
                 {q:"接近核心區域，精神壓迫感極強。", opts: [{t:"堅定意志", type:'good', stat:'w'}, {t:"服用鎮靜劑", type:'bad', stat:'i'}]},
@@ -805,6 +829,40 @@ function startEpicStory() {
         };
     }
 
+     // 2. 定義 6 種戰術選項池
+    const tactics = [
+        { id: 'smash', t: '蠻力衝撞', stat: 's', desc: '造成 1-10% 最大生命傷害' },
+        { id: 'rush',  t: '急速突襲', stat: 'a', desc: '先手 + 閃避提升' },
+        { id: 'analyze', t: '尋找破綻', stat: 'i', desc: '大幅降低 Boss 防禦' },
+        { id: 'trap',  t: '佈置陷阱', stat: 'i', desc: '開場暈眩 Boss' },
+        { id: 'faith', t: '堅定信念', stat: 'w', desc: '獲得護盾 + 減免恐懼' },
+        { id: 'gamble', t: '孤注一擲', stat: 'luck', desc: '隨機賦予多重負面狀態' }
+    ];
+
+    // 3. 隨機抽取 4 個選項供玩家選擇
+    let availableTactics = tactics.sort(() => 0.5 - Math.random()).slice(0, 4);
+
+    // 4. 構建選項數據
+    let bossOpts = availableTactics.map(tac => {
+        return {
+            t: `${tac.t} <span style="font-size:0.8em;color:#aaa">(${tac.desc})</span>`,
+            type: 'good', // 這裡統一標記為 good，具體成功率由 stat 決定
+            stat: tac.stat,
+            boss: true,
+            bossName: bossName,
+            isQuest: isQuest,
+            strategy: tac.id // 傳遞戰術ID
+        };
+    });
+
+    // 5. 組合最終步驟
+    storyData.steps = [
+        {
+            q: "遭遇強敵！你打算採取什麼戰術開局？",
+            opts: bossOpts
+        }
+    ];
+
     storyState = { 
         step: 0, 
         score: 0, 
@@ -815,6 +873,7 @@ function startEpicStory() {
 
     hideGameContainer();
     renderStoryModal();
+}
 }
 
 // 新增：計算事件選項的成功率 (回傳 0-100 的數字)
@@ -887,10 +946,11 @@ function renderStoryModal(showingResult = false) {
     shuffledOpts.forEach(opt => {
         // 1. Boss 戰選項
         if (opt.boss) {
-             btns += `<button class="opt-btn" style="border-left-color:#f44" onclick="storyChoose('${opt.type}', 'luck', true, '${opt.bossName}', ${opt.isQuest})">
-                <div style="font-weight:bold; color:#f44">💀 BOSS戰</div>
-                <div>${opt.t}</div>
-             </button>`;
+             btns += `<button class="opt-btn" style="border-left-color:#f44" onclick="storyChoose('${opt.type}', 'luck', true, '${opt.bossName}', ${opt.isQuest}, '${opt.strategy}')">
+    <div style="font-weight:bold; color:#f44">💀 BOSS戰</div>
+    <div>${opt.t}</div>
+    <div style="font-size:0.75em; color:#ddd; margin-top:2px">成功率: ${getEventSuccessRate(opt.type, opt.stat)}%</div>
+ </button>`;
         } 
         // 2. 普通判定選項
         else {
@@ -925,11 +985,25 @@ function getEventReward() {
     if(roll === 4) { G.water += 2; return "💧 收集露水 (Water +2)"; }
 }
 
-function storyChoose(type, statKey, isBoss, bossName, isQuest) {
+function storyChoose(type, statKey, isBoss, bossName, isQuest, strategy) {
+    // 1. 如果是 Boss 戰選項
     if (isBoss) {
+        // 先進行屬性檢定 (成功/失敗)
+        // 注意：這裡我們暫時把 'good' 傳入 calculateOutcome，代表這是正面檢定
+        let outcome = calculateOutcome('good', statKey);
+        
+        // 記錄日誌
+        let logText = (outcome === 'success' || outcome === 'crit_success') 
+            ? `戰術執行成功！` 
+            : `戰術執行失敗！`;
+        
+        // 關閉故事視窗
         closeModal();
+        showGameContainer();
+        
+        // 觸發戰鬥，並傳入 策略ID 和 檢定結果
         let targetName = bossName || '區域領主';
-        triggerBossFight(targetName, isQuest);
+        triggerBossFight(targetName, isQuest, strategy, outcome);
         return;
     }
     
@@ -1237,35 +1311,42 @@ function triggerExplore(index) {
 }
 
 // 確保探索邏輯正確連接
+// 修改後的 explore 函數
 function explore(n, d, l, desc) { 
-    window.currentLocName = n; // 記錄當前地點名稱供戰鬥使用
+    window.currentLocName = n; 
+    
+    // ★★★ 新增：記錄這次探索的目標資源與危險度，供戰後使用 ★★★
+    window.pendingScavenge = { t: l, d: d };
+    // ========================================================
+
     log('探索', `前往 ${n}...`); 
     
     // 1. 任務檢查
     if(G.activeQuest && G.activeQuest.loc === n) {
         log('任務', '發現任務目標！', 'c-quest');
+        window.pendingScavenge = null; // 任務戰不觸發普通搜刮
         triggerBossFight(G.activeQuest.boss, true);
         return;
     }
 
-    // 2. 地點專屬事件 (機率隨危險度提升)
+    // 2. 地點專屬事件
     if(Math.random() < (0.05 + d * 0.04) && LOC_EVENT_DB[n]) {
+        window.pendingScavenge = null; // 事件有自己的獎勵邏輯
         triggerLocationEvent(n);
         return;
     }
 
     // 3. 遭遇戰鬥檢查
     let combatChance = 0.1 + (d * 0.15); 
-    // 潛行特質修正
     if(G.job.trait === '外送傳說') combatChance -= 0.15;
     
     if(Math.random() < combatChance) {
         log('警告', `高危區域反應！(${Math.floor(combatChance*100)}%)`, 'c-loss');
-        // --- 修正處：直接傳入 null，讓 triggerCombat 內部根據 danger 自動生成敵人 ---
         triggerCombat(null, d); 
     }
-    // 4. 沒遇敵 -> 進入搜刮
+    // 4. 沒遇敵 -> 直接進入搜刮
     else {
+        window.pendingScavenge = null; // 清除標記，避免重複
         doScavenge(l, d); 
     }
 }
@@ -1463,8 +1544,8 @@ function abandonQuest() {
 }
 
 // ==================== 戰鬥與物品 ====================
-function triggerBossFight(name, isQuest=false) { 
-    // 使用動態計算
+function triggerBossFight(name, isQuest=false, strategy='normal', outcome='success') { 
+    
     let typeKey = (name === "最終屍王") ? 'final_boss' : 'boss';
     let stats = getDynamicEnemyStats(typeKey);
 
@@ -1472,7 +1553,7 @@ function triggerBossFight(name, isQuest=false) {
     let atk = stats.atk;
     let bossDodge = (getCurrentTier() - 1) * 10 + 5; 
 
-    // Boss 開場威壓
+    // 1. 計算 Boss 開場威壓 (SAN值扣除)
     let terror = 10; 
     if (name === "最終屍王") terror = 20; 
     if (G.diff === 3) terror = Math.floor(terror * 1.5); 
@@ -1480,62 +1561,119 @@ function triggerBossFight(name, isQuest=false) {
     let willMitigation = Math.floor(getStat('w') * 0.5);
     terror = Math.max(1, terror - willMitigation);
 
-    G.san -= terror;
-    log('遭遇', `強敵的壓迫感讓你呼吸困難！ <span style="color:var(--san-color)">SAN -${terror}</span>`, 'c-loss');
-
-    if (name === "最終屍王") {
-        bossDodge = 50; 
-        hp = Math.floor(hp * 1.2);
-        atk = Math.floor(atk * 1.1);
+    // 2. 應用戰術對 SAN 值的影響
+    let logExtra = "";
+    if (strategy === 'faith' && (outcome === 'success' || outcome === 'crit_success')) {
+        terror = 0; // 堅定信念成功：免疫恐懼
+        logExtra = "(信念免疫)";
+    } else if (outcome === 'fail' || outcome === 'crit_fail') {
+        terror += 5; // 戰術失敗：受到驚嚇
+        logExtra = "(戰術失敗驚嚇 +5)";
     }
 
-    // ★★★ 計算 Boss 固定防禦力 ★★★
+    if (terror > 0) {
+        G.san -= terror;
+        log('遭遇', `強敵的壓迫感讓你呼吸困難！ <span style="color:var(--san-color)">SAN -${terror}</span> ${logExtra}`, 'c-loss');
+    } else {
+        log('遭遇', `你堅定的意志抵擋了強敵的威壓！`, 'c-gain');
+    }
+
+    // 3. 初始化戰鬥數據
     let tier = getCurrentTier();
     let bossDef = (tier * 10) + (G.diff === 3 ? 10 : 0);
-    if (name === "最終屍王") bossDef = 50;
+    if (name === "最終屍王") { bossDodge = 50; hp = Math.floor(hp * 1.2); atk = Math.floor(atk * 1.1); bossDef = 50; }
 
     G.activeSkillCD = 0; 
     G.playerDefCD = 0;
 
     G.combat = { 
-        n:name,
-        baseName: name, 
-        maxHp:hp, 
-        hp:hp, 
-        atk:atk, 
-        
-        // ★★★ 修正後的防禦屬性 ★★★
-        def: bossDef,
-        defP: 0.15, // Boss 預設 15% 減傷
-        // ========================
-
-        sk:'終極毀滅', 
-        isBoss:true, 
-        isQuest:isQuest, 
-        turnCount:0, 
-        buffs:{}, 
-        enemySkillCD:0, 
-        cloneTurns:0, 
-        xpVal: 50 + Math.floor(G.day/2), 
-        isStunned: false, 
-        playerShield: 0, 
-        usedItem: false,
-        dodge: bossDodge
+        n:name, baseName: name, maxHp:hp, hp:hp, atk:atk, def: bossDef, defP: 0.15,
+        sk:'終極毀滅', isBoss:true, isQuest:isQuest, turnCount:0, 
+        buffs:{}, enemySkillCD:0, cloneTurns:0, xpVal: 50 + Math.floor(G.day/2), 
+        isStunned: false, playerShield: 0, usedItem: false, dodge: bossDodge,
+        playerDebuffs: { stun:0, silence:0, blind:0 }
     };
     
-    // ★★★ 新增：Boss 裝備開場特效 (同步加入) ★★★
-    if (G.eq.head && G.eq.head.fx && G.eq.head.fx.t === 'fear_aura') {
-        if (Math.random() < 0.5) {
-            G.combat.buffs.atkDown = 3;
-            log('裝備', `🤡 小丑面具發動：${G.combat.n} 感到恐懼 (攻擊下降)`);
+    // 4. ★★★ 應用 6 種戰術效果 ★★★
+    let isSuccess = (outcome === 'success' || outcome === 'crit_success');
+    
+    if (isSuccess) {
+        log('戰術', `【${strategy}】執行成功！`, 'c-gain');
+        switch(strategy) {
+            case 'smash': // 蠻力衝撞：扣 1-10% 血
+                let pct = 0.01 + Math.random() * 0.09; // 0.01 ~ 0.10
+                let smashDmg = Math.floor(hp * pct);
+                G.combat.hp -= smashDmg;
+                log('戰術', `蠻力衝擊！Boss 損失了 ${smashDmg} (${Math.floor(pct*100)}%) 生命！`, 'c-gain');
+                break;
+            case 'rush': // 急速突襲：先手 + 閃避
+                // 邏輯上如果沒有被暈眩，玩家通常是先手，但這裡給予額外閃避確保優勢
+                G.combat.buffs.dodgeUp = 3; 
+                log('戰術', `身法靈活！獲得 3 回合閃避提升。`, 'c-gain');
+                break;
+            case 'analyze': // 尋找破綻：降防
+                G.combat.buffs.defDown = 4;
+                log('戰術', `弱點識破！Boss 防禦大幅下降 (4回合)。`, 'c-gain');
+                break;
+            case 'trap': // 佈置陷阱：暈眩
+                G.combat.isStunned = true;
+                G.combat.buffs.stun = 1;
+                log('戰術', `陷阱觸發！Boss 開場暈眩 1 回合。`, 'c-gain');
+                break;
+            case 'faith': // 堅定信念：護盾 (SAN免疫已在上面處理)
+                let shieldAmt = Math.floor(G.maxHp * 0.3);
+                G.combat.playerShield = shieldAmt;
+                log('戰術', `信念如鐵！獲得 ${shieldAmt} 點護盾。`, 'c-gain');
+                break;
+            case 'gamble': // 孤注一擲：隨機負面
+                let debuffs = ['bleed', 'burn', 'blind', 'accDown'];
+                let chosen = debuffs[Math.floor(Math.random() * debuffs.length)];
+                G.combat.buffs[chosen] = 3;
+                log('戰術', `賭對了！Boss 陷入 ${chosen} 狀態 (3回合)。`, 'c-gain');
+                break;
         }
+    } else {
+        log('戰術', `【${strategy}】執行失敗！`, 'c-loss');
+        // 失敗懲罰
+        switch(strategy) {
+            case 'smash': // 反震
+                let recoil = Math.floor(G.maxHp * 0.1);
+                G.hp -= recoil;
+                G.combat.buffs.defUp = 3;
+                log('戰術', `衝撞失敗受到反傷 (-${recoil})，Boss 進入防禦姿態。`, 'c-loss');
+                break;
+            case 'rush': // 失足
+                G.combat.playerDebuffs.stun = 1;
+                log('戰術', `突襲失敗摔倒了！開場暈眩 1 回合。`, 'c-loss');
+                break;
+            case 'analyze': // 誤判
+                G.combat.buffs.atkUp = 3;
+                log('戰術', `分析錯誤！激怒了 Boss (攻擊提升)。`, 'c-loss');
+                break;
+            case 'trap': // 故障
+                G.activeSkillCD = 2; // 全技能 CD +2
+                log('戰術', `陷阱卡住了！你手忙腳亂 (技能冷卻增加)。`, 'c-loss');
+                break;
+            case 'faith': // 崩潰
+                // SAN 值加倍扣除已在上面處理
+                log('戰術', `恐懼吞噬了你的內心。`, 'c-loss');
+                break;
+            case 'gamble': // 厄運
+                G.combat.playerDebuffs.bleed = 3;
+                log('戰術', `賭輸了！你自己陷入流血狀態。`, 'c-loss');
+                break;
+        }
+    }
+
+    // 裝備特效 (保留不變)
+    if (G.eq.head && G.eq.head.fx && G.eq.head.fx.t === 'fear_aura' && Math.random() < 0.5) {
+        G.combat.buffs.atkDown = (G.combat.buffs.atkDown || 0) + 3;
+        log('裝備', `🤡 小丑面具發動：${G.combat.n} 感到恐懼`);
     }
     if (G.eq.acc && G.eq.acc.fx && G.eq.acc.fx.t === 'hypnosis') {
         G.combat.buffs.sleep = 3;
         log('裝備', `📻 洗腦廣播發動：${G.combat.n} 陷入深層睡眠`);
     }
-
-    log('遭遇', `強敵出現：${name} (HP:${hp}, ATK:${atk})`, 'c-loss');
     
     let eArea = document.getElementById('enemy-area');
     if (eArea) eArea.style.display = 'block';
@@ -1672,7 +1810,7 @@ function triggerCombat(enemyTemplate, danger) {
         usedItem: false 
     };
 
-    // ★★★ 新增：Boss 裝備開場特效 ★★★
+     // ★★★ 新增：Boss 裝備開場特效 ★★★
     if (G.eq.head && G.eq.head.fx && G.eq.head.fx.t === 'fear_aura') {
         if (Math.random() < 0.5) {
             G.combat.buffs.atkDown = 3;
@@ -1695,20 +1833,6 @@ function triggerCombat(enemyTemplate, danger) {
 
     renderCombat();
 }
-
-// ★★★ 新增：Boss 裝備開場特效 ★★★
-    // 1. 小丑面具 (fear_aura)：敵人開場機率膽怯(降攻)
-    if (G.eq.head && G.eq.head.fx && G.eq.head.fx.t === 'fear_aura') {
-        if (Math.random() < 0.5) {
-            G.combat.buffs.atkDown = 3;
-            log('裝備', `🤡 小丑面具發動：${G.combat.n} 感到恐懼 (攻擊下降)`);
-        }
-    }
-    // 2. 洗腦廣播 (hypnosis)：開場催眠
-    if (G.eq.acc && G.eq.acc.fx && G.eq.acc.fx.t === 'hypnosis') {
-        G.combat.buffs.sleep = 3;
-        log('裝備', `📻 洗腦廣播發動：${G.combat.n} 陷入深層睡眠`);
-    }
 
 // ==================== 修正後的戰鬥渲染 (修復變數未定義錯誤) ====================
 // === 戰鬥視覺輔助函數 ===
@@ -2027,6 +2151,17 @@ function combatRound(act) {
     if (c.buffs.matrix > 0) c.buffs.matrix--;
     if (c.buffs.drift > 0) c.buffs.drift--;
     
+    // ★★★ 新增：物品臨時屬性倒數 ★★★
+    if (c.buffs.itemBuffTimer > 0) {
+        c.buffs.itemBuffTimer--;
+        if (c.buffs.itemBuffTimer === 0) {
+            // 清除臨時屬性 (重置為0)
+            c.buffs.tempStats = {}; 
+            logMsg.push(`<span style="color:#aaa">藥物效果消退了。</span>`);
+        }
+    }
+    // ================================
+
     if (c.buffs.rageShieldTimer > 0) {
         c.buffs.rageShieldTimer--;
         if (c.buffs.rageShieldTimer === 0 && c.playerShield > 0) {
@@ -2087,20 +2222,19 @@ function combatRound(act) {
 
     // === 定義玩家行動函數 (為了可以調換順序) ===
  const doPlayerMove = () => {
-        // ★★★ 修復 1：處理「跳過回合」按鈕 ★★★
+         // ★★★ 1. 新增：處理「跳過回合」按鈕 (必須放在暈眩檢查之前) ★★★
         if (act === 'skip') {
              if (c.playerDebuffs.stun > 0) c.playerDebuffs.stun--;
-             logMsg.push(`<span style="color:#aaa">跳過回合...</span>`);
-             return true; // 結束玩家行動
+             logMsg.push(`<span style="color:#aaa">你無法行動，跳過回合...</span>`);
+             return false; // 返回 false 代表行動完成，讓程式繼續往下跑(去執行敵人回合)
         }
         
-        // ★★★ 修復 2：防止暈眩時點其他按鈕 ★★★
+        // ★★★ 2. 修改：暈眩攔截 ★★★
         if (c.playerDebuffs.stun > 0) {
-            logMsg.push(`<span style="color:#fa0">你處於暈眩狀態，無法行動！(剩餘 ${c.playerDebuffs.stun})</span>`);
-            // 這裡不扣除 stun 回合，因為要等玩家點擊 skip 才能扣
-            return true; // 阻止行動
+             // 如果玩家試圖點擊其他按鈕(如攻擊)，但被暈眩，阻止操作
+             logMsg.push(`<span style="color:#fa0">你被擊暈了！請點擊跳過。</span>`);
+             return true; // 返回 true 代表行動失敗，阻止後續流程
         }
-        // ... (後續代碼保持不變)
 
     // === 2. 被動效果 ===
     if (G.job.passive === 'pills' && Math.random() < 0.33) {
@@ -2699,7 +2833,11 @@ function processEnemyTurn(c, logMsg) {
         if(c.buffs.bleed) { let d=Math.floor(c.maxHp*0.05); c.hp-=d; logMsg.push(`流血 -${d}`); c.buffs.bleed--; }
         if(c.buffs.burn) { let d=Math.floor(c.maxHp*0.03); c.hp-=d; logMsg.push(`燃燒 -${d}`); c.buffs.burn--; }
         if(G.job.passive === 'welder_burn') { c.hp -= Math.floor(c.maxHp*0.01); } 
-        if(G.job.passive === 'god_dot') { let d=Math.floor(c.hp*0.02); c.hp-=d; logMsg.push(`神聖灼燒 -${d}`); }
+     if(G.job.passive === 'god_dot') { 
+            let d = Math.ceil(c.maxHp * 0.01); 
+            c.hp -= d; 
+            logMsg.push(`神聖灼燒 -${d}`); 
+        }
         
         // 殭屍轉化
         if(c.buffs.zombieCountdown > 0) {
@@ -3097,20 +3235,20 @@ function checkCombatEnd(c, logMsg) {
             // 1. 生成 Diablo 式掉落列表
             let loot = generateBossLoot(c.baseName, c.isQuest);
             
-            // 2. 顯示新視窗
             showBossLootWindow(loot, () => {
                 if(c.isQuest) {
-                    completeQuest(); // 任務 Boss 撿完東西後，結算任務
+                    completeQuest(); 
                 } else {
-                    campPhase(); // 地點 Boss 撿完直接回營地
+                    // ★★★ 修改：地點 Boss 打完後，也嘗試進行搜刮 ★★★
+                    continueExploration();
                 }
             });
         }
-        // 普通怪/精英怪 保持原有邏輯 (或也可以改用簡化版列表)
         else { 
             let t=['melee','ranged','head','body','acc','med','throwable'][Math.floor(Math.random()*7)];
             if(t==='med'||t==='throwable') t = (Math.random()<0.5)?'med':'throwable';
-            showLootModal(createItem(t,'random',0), t, campPhase);
+            let lootItem = createItem(t,'random',0);
+            showLootModal(lootItem, t, continueExploration);
         }
     } else {
         c.usedItem = false; 
@@ -3163,6 +3301,37 @@ function useCombatItem(idx) {
             G.san = Math.min(100, G.san + item.stats.san);
             logMsg += `SAN +${item.stats.san} `;
         }
+
+         // ★★★ 插入開始：藥品屬性 Buff/Debuff 處理 ★★★
+        let statChanges = [];
+        // 用來顯示中文名稱的對照表
+        const STAT_NAMES_Display = { s:'力量', a:'敏捷', i:'智力', w:'意志', crit:'暴擊', dodge:'閃避' };
+        
+        // 遍歷物品屬性
+        for (let k in item.stats) {
+            // 如果屬性是戰鬥數值 (排除 hp, san, desc 等)
+            if (['s', 'a', 'i', 'w', 'crit', 'dodge', 'acc'].includes(k)) {
+                let val = item.stats[k];
+                if (val !== 0) {
+                    // 初始化臨時屬性物件
+                    if (!c.buffs.tempStats) c.buffs.tempStats = {};
+                    // 疊加數值
+                    c.buffs.tempStats[k] = (c.buffs.tempStats[k] || 0) + val;
+                    
+                    let sign = val > 0 ? '+' : '';
+                    let name = STAT_NAMES_Display[k] || k;
+                    statChanges.push(`${name}${sign}${val}`);
+                }
+            }
+        }
+        
+        // 如果有屬性變化，設定計時器並顯示日誌
+        if (statChanges.length > 0) {
+            c.buffs.itemBuffTimer = 2; // 設定持續 2 回合
+            logMsg += `<br><span style="color:#ffd700">藥效(2回合): ${statChanges.join(', ')}</span>`;
+        }
+        // ★★★ 插入結束 ★★★
+
         if (item.stats.s) { c.buffs.allUp = 3; logMsg += `力量提升 `; } 
         if (item.stats.eff) {
             if(item.stats.eff === 'bleed' && c.buffs.bleed) c.buffs.bleed=0;
@@ -3429,11 +3598,8 @@ function createItem(type, specificName, forcedTier, forceCommon = false) {
         if (!tpl) tpl = { n: jobBaseName, v: 10 };
         
         baseItem = JSON.parse(JSON.stringify(tpl)); // 深拷貝
-
-        // ★★★ 【修復點：插入這一行】 ★★★ 
-        // 防止資料庫找不到物品時，fallback 物件沒有 stats 導致後續報錯
         if (!baseItem.stats) baseItem.stats = {}; 
-        // ==================================
+
 
         // 專屬裝備數值隨 Tier 成長
         let mul = JOB_TIER_PREFIX[tier - 1].mul;
@@ -3452,6 +3618,14 @@ function createItem(type, specificName, forcedTier, forceCommon = false) {
         baseItem = JSON.parse(JSON.stringify(tpl)); // 深拷貝
         if (!baseItem.stats) baseItem.stats = {};
         
+
+        ['hp', 'san', 'heal', 'eff', 's', 'a', 'i', 'w', 'luck'].forEach(key => {
+            if (baseItem[key] !== undefined && baseItem.stats[key] === undefined) {
+                baseItem.stats[key] = baseItem[key];
+            }
+        });
+
+
         // 通用裝備基礎屬性注入
         let bonusPoints = tier * 2; 
         if(type === 'melee') baseItem.stats.s = (baseItem.stats.s||0) + Math.ceil(bonusPoints*0.8);
@@ -3596,6 +3770,9 @@ function getStat(k) {
     }
     
     if(G.combat && G.combat.buffs) {
+
+        if (G.combat.buffs.tempStats && G.combat.buffs.tempStats[k]) {
+            base += G.combat.buffs.tempStats[k];}
         if(G.combat.buffs.allUp && ['s','a','i','w'].includes(k)) base = Math.floor(base * 1.5); 
         if(G.combat.buffs.dlss && k === 'a') base = Math.floor(base * 1.5);
         if(G.combat.buffs.redbull && k === 'a') base = Math.floor(base * 1.3);
@@ -4409,63 +4586,79 @@ function getPlayerCombatPower() {
     };
 }
 
-// 3. 核心：根據類型生成動態數值 (v4.0 - 移除懲罰)
+// 3. 核心：根據類型生成動態數值 (v4.1 修復版 - 降低難度曲線)
 function getDynamicEnemyStats(type) {
     let p = getPlayerCombatPower();
     let diff = G.diff; 
 
     let variance = 0.85 + Math.random() * 0.3; 
 
-    // 目標節奏
-    let target = { playerTurns: 2.5, enemyTurns: 10 }; 
+    // 目標節奏 (回合數)
+    // 這裡定義：玩家需要幾回合殺死怪，怪需要幾回合殺死玩家
+    let target = { playerTurns: 3.0, enemyTurns: 10 }; // 普通怪改為 3 回合，讓戰鬥稍微輕鬆點
 
     if (type === 'elite') {
         target.playerTurns = 6;
-        target.enemyTurns = 7;
+        target.enemyTurns = 8;
     } else if (type === 'boss') {
-        target.playerTurns = 14; 
-        target.enemyTurns = 5;   
+        target.playerTurns = 15; 
+        target.enemyTurns = 6;   
     } else if (type === 'final_boss') {
-        target.playerTurns = 20;
-        target.enemyTurns = 4;
+        target.playerTurns = 25;
+        target.enemyTurns = 5;
         variance = 1.0; 
     }
 
-     // --- ★★★ 修改開始：階梯式難度係數 (Time Scaling) ★★★ ---
-    let timeScale = 1.0;
-    if (G.day <= 30) {
-        timeScale = 0.6; // 新手保護期：怪物強度 60%
-    } else if (G.day <= 60) {
-        timeScale = 0.8; // 過渡期：怪物強度 80% (避免斷層)
-    }
-    // Day 60+ 恢復 100% 強度
-    // -----------------------------------------------------
-    
+    // --- ★★★ 修改 1：難度係數明確化 ★★★ ---
     let hpMult = 1.0;
     let atkMult = 1.0;
 
-    if (diff === 2) { hpMult = 1.3; atkMult = 1.2; }
-    else if (diff === 3) { hpMult = 1.8; atkMult = 1.5; }
+    if (diff === 1) { 
+        // 🟢 歡快模式：怪物全面削弱 25%
+        hpMult = 0.75; 
+        atkMult = 0.75; 
+    } else if (diff === 2) { 
+        // 🟡 標準模式：基準
+        hpMult = 1.0; 
+        atkMult = 1.0; 
+    } else if (diff === 3) { 
+        // 🔴 挑戰模式：增強
+        hpMult = 1.3; 
+        atkMult = 1.3; 
+    }
+    // ------------------------------------
 
-    // ★★★ 關鍵修正：移除了針對高 PowerScore 的額外懲罰代碼 ★★★
-    // 現在讓玩家盡情享受神裝帶來的數值碾壓感
+    // --- ★★★ 修改 2：階梯式時間係數 (Time Scaling) ★★★ ---
+    // 這是為了防止新手期(裝備沒成型)遇到太強的怪
+    let timeScale = 1.0;
+    if (G.day <= 15) {
+        timeScale = 0.5; // Day 0-15: 50% 強度 (極其溫柔)
+    } else if (G.day <= 30) {
+        timeScale = 0.7; // Day 16-30: 70% 強度
+    } else if (G.day <= 60) {
+        timeScale = 0.9; // Day 31-60: 90% 強度
+    }
+    // Day 60+ 恢復 100% 強度
+    // -----------------------------------------------------
 
-    // 成長係數 (0.85) - 保持不變，確保基礎成長感
+    // 成長係數 (0.85) - 讓怪物比玩家弱一點點，產生「爽感」
     let scalingFactor = 0.85; 
     let adjustedAtk = p.atk * scalingFactor;
-    adjustedAtk += (G.day * 2.5); 
 
-    // Day 30 前降低天數成長幅度，避免成長太快
-    let dayGrowth = (G.day <= 30) ? (G.day * 1.5) : (G.day * 2.5);
-    adjustedAtk += dayGrowth; 
-    
-     // 應用 timeScale
+    // --- ★★★ 修改 3：大幅降低天數帶來的膨脹 (之前加太多了) ★★★ ---
+    // 舊代碼這裡加了兩次 day，導致數值爆炸
+    // 現在只加一次，且數值很小，主要只為了讓後期不至於太弱
+    let dayFlatBonus = G.day * 0.5; 
+    adjustedAtk += dayFlatBonus; 
+    // -----------------------------------------------------------
+
+    // 計算敵人 HP
     let eHP = Math.floor(adjustedAtk * target.playerTurns * hpMult * variance * timeScale);
     
     // 計算敵人攻擊力
     let requiredNetDmg = p.hp / target.enemyTurns;
     
-    // 依然保留對吸血/回血的輕微抵抗，否則玩家會無敵
+    // 依然保留對吸血/回血的輕微抵抗
     if (p.powerScore > 1.4) requiredNetDmg *= 1.1;
 
     let effectiveReduc = Math.max(0.1, 1 - p.reduc); 
@@ -4473,13 +4666,14 @@ function getDynamicEnemyStats(type) {
     
     let eAtk = Math.floor((rawDmgNeeded + p.def) * atkMult * variance * timeScale);
 
-    // 天數保底 (同樣應用 timeScale)
-    let dayScale = 1 + (G.day * 0.15); 
-    let minHP = 40 * dayScale * timeScale;
-    let minAtk = 10 + (G.day * 0.7) * timeScale;
-    
-    if (type === 'boss' || type === 'elite') { minHP *= 4.5; minAtk *= 1.6; }
-    if (type === 'final_boss') { minHP = 12000; minAtk = 280; } 
+    // --- ★★★ 修改 4：保底數值也受到 timeScale 影響 ★★★ ---
+    // 確保 Day 1 絕對不會出現攻擊力 20 的怪
+    let dayScale = 1 + (G.day * 0.05); // 降低保底成長速度
+    let minHP = 30 * dayScale * timeScale;
+    let minAtk = 5 * dayScale * timeScale; // 最低攻擊力降低
+
+    if (type === 'boss' || type === 'elite') { minHP *= 4.0; minAtk *= 1.5; }
+    if (type === 'final_boss') { minHP = 12000; minAtk = 250; } 
 
     eHP = Math.max(eHP, Math.floor(minHP));
     eAtk = Math.max(eAtk, Math.floor(minAtk));
@@ -4729,8 +4923,7 @@ G.unlockedSkills.forEach(sid => {
     openModal("⚡ 選擇技能", html, `<button onclick="closeModal()">取消</button>`);
 }
 
-// 萬能技能解析器
-// 優化版：支援詳細日誌與混合傷害的技能解析器
+// 萬能技能解析器 (修復版 v2：括號結構嚴格檢查)
 function performSkill(sid) {
     let s = SKILL_DB[sid];
     let c = G.combat;
@@ -4769,6 +4962,15 @@ function performSkill(sid) {
         });
         if (s.scale.fixed) power += s.scale.fixed;
     }
+
+    // 林正英專屬殭屍剋星被動
+    let isTaoist = (G.job.n && G.job.n.includes('道士'));
+    let isZombie = (c.n.includes('屍') || c.n.includes('感染') || c.n.includes('殭') || c.buffs.zombie);
+
+    if (isTaoist && isZombie) {
+        power = Math.floor(power * 1.25);
+        logMsg.push(`<span style="color:#ffd700; font-size:0.8em;">(道術加成 +25%)</span>`);
+    }
     
     // 4. 執行效果
     let totalDmg = 0;
@@ -4779,7 +4981,6 @@ function performSkill(sid) {
             if (eff.t === 'dmg') {
                 let base = power;
                 if (eff.var) base *= (1 + (Math.random() * eff.var - (eff.var/2)));
-                // 技能基礎傷害通常不加上武器傷害，除非是普攻類技能，但為了平衡初期體驗，這裡保留微量武器加成
                 let weaponDmg = (getEquipVal(G.eq.melee) + getEquipVal(G.eq.ranged)) / 2;
                 totalDmg += Math.floor(base + (weaponDmg * 0.5));
             }
@@ -4827,8 +5028,123 @@ function performSkill(sid) {
                 c.buffs.stun = (c.buffs.stun || 0) + eff.v;
                 logMsg.push(`<span style="color:#fa0">暈眩 ${eff.v} 回</span>`);
             }
+
+            // --- D. 特殊技能 (Matthew) ---
+            else if (eff.t === 'random_amazon') {
+                const amazonItems = [
+                    { n: "氣槍", dmg: 3, unit: "支", tag: "精準", debuff: { k: "defDown", v: 2, t: "debuff" } }, 
+                    { n: "伐木斧", dmg: 6, unit: "把", tag: "重擊", debuff: { k: "stun", v: 1, t: "debuff" } }, 
+                    { n: "廚房刀", dmg: 4, unit: "把", tag: "鋒利", debuff: { k: "bleed", v: 2, t: "debuff" } }, 
+                    { n: "花生油", dmg: 2, unit: "罐", tag: "易燃", debuff: { k: "burn", v: 3, t: "debuff" } }, 
+                    { n: "啞鈴", dmg: 5, unit: "個", tag: "壓制", debuff: { k: "accDown", v: 3, t: "debuff" } }, 
+                    { n: "樂高積木", dmg: 3, unit: "盒", tag: "痛楚", debuff: { k: "atkDown", v: 2, t: "debuff" } }, 
+                    { n: "防狼噴霧", dmg: 1, unit: "瓶", tag: "致盲", debuff: { k: "blind", v: 2, t: "debuff" } }, 
+                    { n: "急凍魚", dmg: 5, unit: "條", tag: "冰凍", debuff: { k: "accDown", v: 2, t: "debuff" } }, 
+                    { n: "平底鍋", dmg: 4, unit: "個", tag: "格擋", debuff: { k: "shield", v: 5, t: "shield" } }, 
+                    { n: "機械鍵盤", dmg: 3, unit: "個", tag: "嘲諷", debuff: { k: "atkDown", v: 2, t: "debuff" } } 
+                ];
+
+                let item = amazonItems[Math.floor(Math.random() * amazonItems.length)];
+                let maxQty = 6 + Math.floor(getStat('luck') * 0.4) + Math.floor(G.day * 0.15);
+                let qty = Math.max(1, Math.floor(Math.random() * maxQty) + 1);
+                
+                let dimFactor = Math.sqrt(qty) * 2; 
+                if (qty <= 3) dimFactor = qty; 
+
+                let rawDmg = item.dmg * dimFactor;
+                let finalDmg = Math.floor(rawDmg * (1 + power * 0.05));
+                
+                totalDmg += Math.max(1, finalDmg);
+                
+                if (item.debuff) {
+                    let effectChance = 0.2 + (qty * 0.03); 
+                    if (Math.random() < effectChance) {
+                        if (item.debuff.t === 'debuff') {
+                            c.buffs[item.debuff.k] = (c.buffs[item.debuff.k] || 0) + item.debuff.v;
+                            logMsg.push(`<span style="color:#a0f">附加: ${item.tag}</span>`);
+                        } else if (item.debuff.t === 'shield') {
+                            let shieldAmt = item.debuff.v * qty; 
+                            c.playerShield += shieldAmt;
+                            logMsg.push(`<span style="color:#fa0">擋子彈: 盾+${shieldAmt}</span>`);
+                        }
+                    }
+                }
+
+                const quotes = [
+                    "「雙11淨低嘅死貨，送畀你！」",
+                    "「系統出錯發多咗貨？算啦照殺！」",
+                    "「Amazon Prime 次日達，接招！」",
+                    "「呢批貨好評率 99%，你試下！」",
+                    "「清倉大減價，全部一折！」"
+                ];
+                let quote = quotes[Math.floor(Math.random() * quotes.length)];
+                
+                if (item.n === '樂高積木') quote = "「踩中呢個痛過生仔呀！」";
+                if (item.n === '急凍魚') quote = "「新鮮空運，仲識跳架！」";
+                if (item.n === '顯卡') quote = "「呢張卡依家炒到好貴架！」";
+                if (item.n === '花生油') quote = "「小心地滑！」";
+
+                logMsg.push(`${quote} (訂購了 ${qty} ${item.unit} <strong style="color:#ffd700">${item.n}</strong>)`);
+            }
+
+            // Matthew: 醫管局供應商
+            else if (eff.t === 'random_medical') {
+                const medItems = [
+                    { n: "外科口罩", v: 10, type: "shield", desc: "防禦" },
+                    { n: "消毒液", v: 5, type: "san", desc: "清爽" }, 
+                    { n: "必理痛", v: 10, type: "hp", desc: "止痛" }, 
+                    { n: "繃帶", v: 8, type: "hp", desc: "包紮" },
+                    { n: "維他命C", v: 1, type: "all_up", desc: "狀態" } 
+                ];
+                
+                let item = medItems[Math.floor(Math.random() * medItems.length)];
+                let qty = Math.max(1, Math.floor(Math.random() * 3) + 1);
+                if (getStat('luck') > 20 && Math.random() < 0.5) qty += 1;
+                
+                const medQuotes = [
+                    "「利用內部關係調咗批貨...」",
+                    "「雖然過咗期，但應該食唔死人。」",
+                    "「呢啲係戰略儲備，慳啲使！」",
+                    "「根據大數據分析，依家你需要呢個。」"
+                ];
+                let mQuote = medQuotes[Math.floor(Math.random() * medQuotes.length)];
+                
+                logMsg.push(`${mQuote} (調用了 ${qty} ${item.n})`);
+                
+                if (item.type === 'hp') {
+                    let heal = item.v * qty;
+                    G.hp = Math.min(G.maxHp, G.hp + heal);
+                    logMsg.push(`<span style="color:#4f4">HP +${heal}</span>`);
+                } else if (item.type === 'san') {
+                    let heal = item.v * qty;
+                    G.san = Math.min(100, G.san + heal);
+                    logMsg.push(`<span style="color:#88f">SAN +${heal}</span>`);
+                } else if (item.type === 'shield') {
+                    let shield = item.v * qty;
+                    c.playerShield += shield;
+                    logMsg.push(`<span style="color:#fa0">護盾 +${shield}</span>`);
+                } else if (item.type === 'all_up') {
+                    c.buffs.ignoreDef = 3;
+                    logMsg.push(`<span style="color:#ffd700">免疫力提升(無視防禦)</span>`);
+                }
+            }
+
+            // 林正英: 殭屍符
+            else if (eff.t === 'zombie_curse') {
+                if (c.buffs.zombie) {
+                    let base = power * 2.0; 
+                    let weaponDmg = (getEquipVal(G.eq.melee) + getEquipVal(G.eq.ranged)) / 2;
+                    totalDmg += Math.floor(base + weaponDmg);
+                    c.isStunned = true; 
+                    c.buffs.stun = 1;
+                    logMsg.push(`<span style="color:#fa0">鎮屍！造成暴擊並定身</span>`);
+                } else {
+                    c.buffs.zombieCountdown = eff.v;
+                    logMsg.push(`<strong style="color:#a5f">貼符！${eff.v}回合後將轉化敵人</strong>`);
+                }
+            }
             
-            // --- D. Buff/Debuff (大幅優化顯示邏輯) ---
+            // --- E. Buff/Debuff ---
             else if (eff.t === 'buff') {
                 c.buffs[eff.k] = (c.buffs[eff.k] || 0) + eff.v;
                 let name = STAT_NAMES[eff.k] || eff.k;
@@ -4836,7 +5152,6 @@ function performSkill(sid) {
                 logMsg.push(`<span style="color:#4f4">${desc}</span>`);
             }
             else if (eff.t === 'debuff') {
-                // 特殊處理流血和燃燒
                 if (eff.k === 'bleed' || eff.k === 'burn') {
                     c.buffs[eff.k] = (c.buffs[eff.k] || 0) + eff.v;
                     let name = STAT_NAMES[eff.k];
@@ -4848,8 +5163,8 @@ function performSkill(sid) {
                     logMsg.push(`<span style="color:#a0f">${desc}</span>`);
                 }
             }
-        });
-    }
+        }); // forEach 結束
+    } // if s.effects 結束
     
     // 5. 輸出日誌
     log('技能', `<span style="color:#ffd700; font-weight:bold">${s.n}</span>: ${s.log || ''}`, 'c-skill');
@@ -4894,7 +5209,25 @@ function performSkill(sid) {
         checkCombatEnd(c, []);
     }
 }
-
+// ★★★ 新增：戰鬥勝利後繼續探索的邏輯 ★★★
+function continueExploration() {
+    // 檢查是否有暫存的探索目標
+    if (window.pendingScavenge) {
+        let p = window.pendingScavenge;
+        window.pendingScavenge = null; // 清除標記，防止無限循環
+        
+        log('探索', '威脅已清除，繼續搜尋區域物資...', 'c-gain');
+        
+        // 執行原本的搜刮邏輯 (傳入原本的類型和危險度)
+        // doScavenge 會處理結算介面，它的 callback 會指向 campPhase
+        doScavenge(p.t, p.d);
+    } else {
+        // 如果沒有待搜刮項目 (例如只是單純的事件戰鬥)，直接回營地
+        campPhase();
+    }
+}
+// 將其加入全局導出，防止報錯
+window.continueExploration = continueExploration;
 
 
 // Export all functions to window at once
