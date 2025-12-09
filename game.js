@@ -1468,7 +1468,7 @@ function abandonQuest() {
 // ==================== 戰鬥與物品 ====================
 function triggerBossFight(name, isQuest=false) { 
 function triggerBossFight(name, isQuest=false) { 
-    // ★★★ 使用動態計算 (新代碼) ★★★
+    // 使用動態計算
     let typeKey = (name === "最終屍王") ? 'final_boss' : 'boss';
     let stats = getDynamicEnemyStats(typeKey);
 
@@ -1476,33 +1476,28 @@ function triggerBossFight(name, isQuest=false) {
     let atk = stats.atk;
     let bossDodge = (getCurrentTier() - 1) * 10 + 5; 
 
-    // ★★★ 新增：Boss 開場威壓 ★★★
-    let terror = 10; // 基礎扣 10
-    if (name === "最終屍王") terror = ; // 屍王扣 20
-    if (G.diff === 3) terror = Math.floor(terror * 1.5); // 噩夢加成
+    // Boss 開場威壓
+    let terror = 10; 
+    if (name === "最終屍王") terror = 20; 
+    if (G.diff === 3) terror = Math.floor(terror * 1.5); 
 
-    // 意志力(Will) 可以抵消部分恐懼
     let willMitigation = Math.floor(getStat('w') * 0.5);
     terror = Math.max(1, terror - willMitigation);
 
     G.san -= terror;
     log('遭遇', `強敵的壓迫感讓你呼吸困難！ <span style="color:var(--san-color)">SAN -${terror}</span>`, 'c-loss');
-    // ============================
 
     if (name === "最終屍王") {
         bossDodge = 50; 
-        // 最終Boss給予額外的壓力係數
         hp = Math.floor(hp * 1.2);
         atk = Math.floor(atk * 1.1);
     }
 
-    // ★★★ 新增：Boss 固定防禦力 ★★★
+    // ★★★ 計算 Boss 固定防禦力 ★★★
     let tier = getCurrentTier();
-    // Boss 基礎防禦較高：T1=10, T2=20...
     let bossDef = (tier * 10) + (G.diff === 3 ? 10 : 0);
     if (name === "最終屍王") bossDef = 50;
-    // ============================
-    
+
     G.activeSkillCD = 0; 
     G.playerDefCD = 0;
 
@@ -1512,6 +1507,12 @@ function triggerBossFight(name, isQuest=false) {
         maxHp:hp, 
         hp:hp, 
         atk:atk, 
+        
+        // ★★★ 修正後的防禦屬性 ★★★
+        def: bossDef,
+        defP: 0.15, // Boss 預設 15% 減傷
+        // ========================
+
         sk:'終極毀滅', 
         isBoss:true, 
         isQuest:isQuest, 
@@ -1523,10 +1524,21 @@ function triggerBossFight(name, isQuest=false) {
         isStunned: false, 
         playerShield: 0, 
         usedItem: false,
-        dodge: bossDodge,
-        defP: 0.15 // Boss 自帶 15% 減傷
+        dodge: bossDodge
     };
     
+    // ★★★ 新增：Boss 裝備開場特效 (同步加入) ★★★
+    if (G.eq.head && G.eq.head.fx && G.eq.head.fx.t === 'fear_aura') {
+        if (Math.random() < 0.5) {
+            G.combat.buffs.atkDown = 3;
+            log('裝備', `🤡 小丑面具發動：${G.combat.n} 感到恐懼 (攻擊下降)`);
+        }
+    }
+    if (G.eq.acc && G.eq.acc.fx && G.eq.acc.fx.t === 'hypnosis') {
+        G.combat.buffs.sleep = 3;
+        log('裝備', `📻 洗腦廣播發動：${G.combat.n} 陷入深層睡眠`);
+    }
+
     log('遭遇', `強敵出現：${name} (HP:${hp}, ATK:${atk})`, 'c-loss');
     
     let eArea = document.getElementById('enemy-area');
