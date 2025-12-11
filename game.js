@@ -783,21 +783,18 @@ function checkLevelUp() {
 // ==================== 5. 故事與判定 ====================
 let storyState = { step: 0, score: 0, data: null, type: '', lastResult: '' };
 
+// 修改：修復變數名稱錯誤 (isQuest -> isQuestStory)
 function startEpicStory() {
     let storyData;
-    let isQuestStory = false;
+    let isQuestStory = false; // ★ 正確的變數名稱定義在這裡
+    let bossName = '區域領主';
 
     // 優先檢查是否有活躍任務
     if (G.activeQuest) {
         let q = G.activeQuest;
-        isQuestStory = true;
-        let bossName = '區域領主';
-        
-        // 1. 確定 Boss 名稱與情境
-    if (G.activeQuest) {
-        let q = G.activeQuest;
-        isQuestStory = true;
+        isQuestStory = true; // 標記為任務劇情
         bossName = q.boss;
+        
         storyData = {
             title: `⚔️ 任務決戰：${q.loc}`,
             intro: `你依照情報來到了 <strong>${q.loc}</strong>。<br>空氣中瀰漫著令人作嘔的氣息，${q.boss} 就在深處。`,
@@ -806,7 +803,7 @@ function startEpicStory() {
                 {q:"你發現了大門的電子鎖被破壞了。", opts: [{t:"修復電路", type:'good', stat:'i'}, {t:"尋找通風口", type:'bad', stat:'luck'}]},
                 {q:"接近核心區域，精神壓迫感極強。", opts: [{t:"堅定意志", type:'good', stat:'w'}, {t:"服用鎮靜劑", type:'bad', stat:'i'}]},
                 {q:"前方就是目標的巢穴！", opts: [{t:"佈置陷阱", type:'good', stat:'i'}, {t:"拔刀衝鋒", type:'bad', stat:'s'}]},
-                // Boss 選項標記 isQuest: true
+                // Boss 選項標記
                 {q:`${q.boss} 出現在你面前！`, opts: [{t:"尋找弱點攻擊", type:'good', boss:true, bossName:q.boss, isQuest:true}, {t:"正面迎擊", type:'bad', boss:true, bossName:q.boss, isQuest:true}]}
             ]
         };
@@ -846,19 +843,20 @@ function startEpicStory() {
     let bossOpts = availableTactics.map(tac => {
         return {
             t: `${tac.t} <span style="font-size:0.8em;color:#aaa">(${tac.desc})</span>`,
-            type: 'good', // 這裡統一標記為 good，具體成功率由 stat 決定
+            type: 'good', 
             stat: tac.stat,
             boss: true,
             bossName: bossName,
-            isQuest: isQuest,
-            strategy: tac.id // 傳遞戰術ID
+            // ★★★ 修復點：原本這裡是 isQuest (未定義)，必須改為 isQuestStory ★★★
+            isQuest: isQuestStory, 
+            strategy: tac.id 
         };
     });
 
-    // 5. 組合最終步驟
+    // 5. 組合最終步驟 (覆蓋原本的隨機步驟，強制進入 Boss 戰術選擇)
     storyData.steps = [
         {
-            q: "遭遇強敵！你打算採取什麼戰術開局？",
+            q: `遭遇強敵 <strong style="color:#f44">${bossName}</strong>！你打算採取什麼戰術開局？`,
             opts: bossOpts
         }
     ];
@@ -873,7 +871,6 @@ function startEpicStory() {
 
     hideGameContainer();
     renderStoryModal();
-}
 }
 
 // 新增：計算事件選項的成功率 (回傳 0-100 的數字)
@@ -1276,12 +1273,42 @@ function showStats() {
     openModal("詳細屬性", html, `<button onclick="closeModal()">關閉</button>`);
 }
 
+// 修改：強制任務地點出現
 function exploreSetup() {
-// ★★★ 新增這兩行來隱藏敵人區域 (保險起見) ★★★
+    // 隱藏敵人區域
     document.getElementById('enemy-area').style.display = 'none';
     document.getElementById('enemy-area').innerHTML = '';
 
-    let locs = LOCATIONS.sort(()=>0.5-Math.random()).slice(0, 9);
+    // 1. 先打亂所有地點
+    let allLocs = [...LOCATIONS].sort(() => 0.5 - Math.random());
+    
+    // 2. 預設取前 9 個
+    let locs = allLocs.slice(0, 9);
+
+    // ★★★ 核心修復：如果有任務，強制任務地點出現 ★★★
+    if (G.activeQuest) {
+        let qLocName = G.activeQuest.loc;
+        
+        // 檢查這 9 個裡面有沒有包含任務地點
+        let alreadyHas = locs.some(l => l.n === qLocName);
+        
+        if (!alreadyHas) {
+            // 如果沒有，從總表裡找出那個地點的資料
+            let targetLocData = LOCATIONS.find(l => l.n === qLocName);
+            
+            // 如果在資料庫裡找到了這個地點
+            if (targetLocData) {
+                // 把第 9 個格子替換成任務地點
+                locs[8] = targetLocData;
+                // 再次打亂，讓它不要總是出現在最後一個位置
+                locs = locs.sort(() => 0.5 - Math.random());
+            } else {
+                console.error(`錯誤：QUEST_DB 中的地點 "${qLocName}" 在 LOCATIONS.json 中找不到對應資料！`);
+            }
+        }
+    }
+    // =================================================
+
     window.currentLocs = locs;
     
     let html = `<div style="margin-bottom:5px; color:#fff">📍 選擇地點: <button onclick="renderCampActions()" style="display:inline-block;padding:2px 5px;width:auto;">↩️</button></div>`;
@@ -1289,7 +1316,8 @@ function exploreSetup() {
     
     locs.forEach((l, index) => {
         let isQuest = G.activeQuest && G.activeQuest.loc === l.n;
-        let qStyle = isQuest ? 'border-color:var(--quest-color)' : '';
+        // 如果是任務地點，邊框變色並加強顯示
+        let qStyle = isQuest ? 'border: 2px solid var(--quest-color); box-shadow: 0 0 10px var(--quest-color);' : '';
         let dClass = l.d <= 2 ? 'd-low' : l.d >= 5 ? 'd-dead' : l.d >= 4 ? 'd-high' : 'd-mid';
         let dText = l.d <= 2 ? '低' : l.d >= 5 ? '極危' : l.d >= 4 ? '高' : '中';
         
@@ -1297,7 +1325,7 @@ function exploreSetup() {
             <div class="loc-name">${isQuest ? '👑 ' : ''}${l.n}</div>
             <div class="loc-info">
                 <span class="loc-danger ${dClass}">危:${dText}</span>
-                <span>${isQuest ? '任務' : l.desc}</span>
+                <span>${isQuest ? '<strong style="color:var(--quest-color)">任務目標</strong>' : l.desc}</span>
             </div>
         </button>`;
     });
