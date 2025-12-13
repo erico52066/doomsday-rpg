@@ -4,11 +4,15 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>末蝕紀元 v0.72 改良版</title>
+    <meta name="description" content="在末世中生存，探索廢土，建立你的傳奇故事。">
     <!-- Browser tab icon -->
     <link rel="icon" href="data/images/icon.png">
 
-    <!-- Discord/Social thumbnail -->
-    <meta property="og:image" content="https://ricky10099.github.io/doomsday-rpg/data/images/thumbnail.png">
+    <!-- Open Graph Meta Tags -->
+    <meta property="og:url" content="https://erico52066.github.io/doomsday-rpg/">
+    <meta property="og:type" content="application">
+    <meta property="og:site_name" content="末蝕紀元">
+    <meta property="og:image" content="https://erico52066.github.io/doomsday-rpg/data/images/thumbnail.png">
     <meta property="og:title" content="末蝕紀元 v0.72 改良版">
     <meta property="og:description" content="在末世中生存，探索廢土">
 
@@ -22,8 +26,11 @@
 
     <meta name="theme-color" content="#ffaa00">
     <link rel="stylesheet" href="style.css" />
+    <script type="module" src="./GameData.js"></script>
+    <script type="module" src="./GameMain.js"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.15.2/dist/cdn.min.js"></script>
 </head>
-<body>
+<body x-data="Global">
     <div id="game-container" style="display:none">
         <div id="weather-bar">
             <span id="w-text">☀️ 晴朗</span></span>
@@ -79,18 +86,17 @@
     </div>
 
     <!-- Start Screens -->
-    <div id="screen-start" class="overlay">
+    <div id="screen-start" class="overlay" x-show="$store.ui.showStart" style="display: none;">
         <h1 style="color:var(--r-legend); font-size: 2.5em; text-transform: uppercase; margin-bottom:10px; text-shadow: 0 0 20px rgba(255,170,0,0.5);">末蝕紀元 v0.72 改良版</h1>
-        <p style="color:#888; margin-bottom: 20px;">12/10/25:新增角色|平衡難度|新增角色裝備|新藥品系統</p>
-        <div style="display:flex; gap:10px;">
-            <button type="button" onclick="startGame(1)" style="width:120px;text-align:center">🟢 歡快模式</button>
-            <button type="button" onclick="startGame(2)" style="width:120px;text-align:center;border-color:var(--r-rare)">🟡 標准模式</button>
-            <button type="button" onclick="startGame(3)" style="width:120px;text-align:center;border-color:var(--r-legend)">🔴 挑戰模式</button>
+        <p style="color:#888; margin-bottom: 20px;" x-text="updateLog"></p>
+        <div style="display:flex; gap:10px;" >
+            <button type="button" @click="startGame(1)" style="width:120px;text-align:center">🟢 歡快模式</button>
+            <button type="button" x-bind="startGame(2)" style="width:120px;text-align:center;border-color:var(--r-rare)">🟡 標准模式</button>
+            <button type="button" x-bind="startGame(3)" style="width:120px;text-align:center;border-color:var(--r-legend)">🔴 挑戰模式</button>
         </div>
     </div>
 
-    <div id="screen-jobs" class="overlay" style="display:none; flex-direction:column; justify-content:flex-start; padding-top:5vh;">
-    
+    <div id="screen-jobs" class="overlay" x-show="$store.ui.showJobSelection" style="display:none; flex-direction:column; justify-content:flex-start; padding-top:5vh;"> 
     <!-- 標題區 -->
     <div style="text-align:center; margin-bottom:15px;">
         <h2 style="color:#ccc; margin:0 0 10px 0;">Step 1: 選擇前世身份</h2>
@@ -113,19 +119,69 @@
         max-width: 1000px; 
         max-height: 65vh; 
         overflow-y: auto; 
-        display: grid; 
+        display: flex; 
         grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); 
         gap: 15px; 
         padding: 5px;
-        align-content: start;">
-        <!-- JS 會將內容渲染在這裡 -->
+        align-content: start;
+        justify-content: center;">
+            <div x-show="$store.ui.showJobIntros" style="text-align:center; padding:20px; color:#aaa;">
+                <h3 style="margin-bottom:20px; color:#fff;">請點擊上方按鈕選擇系別</h3>
+                <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap:15px; text-align:left; width:100%; max-width:600px;">
+                    <div style="border-left:3px solid #aaa; padding-left:10px;">
+                        <strong style="color:#d96">🛡️ 鐵衛</strong><br>
+                        <span style="font-size:0.8em">高生存、防禦、格擋、回血。</span>
+                    </div>
+                    <div style="border-left:3px solid #f44; padding-left:10px;">
+                        <strong style="color:#f44">⚔️ 狂戰</strong><br>
+                        <span style="font-size:0.8em">高爆發、以血換血、燃燒。</span>
+                    </div>
+                    <div style="border-left:3px solid #4f4; padding-left:10px;">
+                        <strong style="color:#4f4">🏹 遊俠</strong><br>
+                        <span style="font-size:0.8em">高敏捷、閃避、暴擊、連擊。</span>
+                    </div>
+                    <div style="border-left:3px solid #4cf; padding-left:10px;">
+                        <strong style="color:#4cf">🔮 秘法</strong><br>
+                        <span style="font-size:0.8em">高智力、控制(暈/睡)、異常狀態。</span>
+                    </div>
+                    <div style="border-left:3px solid #ffd700; padding-left:10px;">
+                        <strong style="color:#ffd700">🦄 特殊</strong><br>
+                        <span style="font-size:0.8em">召喚、金錢攻擊、運氣機制。</span>
+                    </div>
+                </div>
+                <p style="margin-top:30px; font-size:0.9em; color:#666;">點擊上方按鈕即可查看詳細角色數值</p>
+            </div>
+                <template id="job-template" x-show="$store.ui.showJobs" x-for="info in $store.data.jobs">
+                    <div class="comp-box" style="cursor: pointer; text-align: left; border: 1px solid #ff4444; display: flex; flex-direction: column; justify-content: space-between;" :style="{'border-color': info.color}" x-bind="selectJob(info, info.stat)">
+            <div>
+                <div class="q3" style="font-size:1.1em; margin-bottom:8px; color:#f44; text-shadow:none;" x-text="info.name" :style="{color: info.color}">Cosplayer (Lag)</div>
+                <div style="font-size:0.9em; margin-bottom:8px; background:#1a1a1a; padding:4px; border-radius:3px; text-align:center;">
+                    <span style="color:#f66" x-text="'力' + info.stat.str">力4</span> 
+                    <span style="color:#4f4" x-text="'敏' + info.stat.agi">敏6</span> 
+                    <span style="color:#4cf" x-text="'智' + info.stat.int">智8</span> 
+                    <span style="color:#f4f" x-text="'意' + info.stat.wil">意5</span>
+                </div>
+                <div style="font-size:0.85em; color:#ccc; line-height:1.5;" x-text="info.desc">高智商，武器易損壞。</div>
+            </div>
+            <div style="margin-top:10px; font-size:0.8em; color:#666; text-align:right;" x-text="info.trait">
+                特質: 玻璃大炮
+            </div>
+    </template>
     </div>
 </div>
-
-    <div id="screen-mbti" class="overlay" style="display:none">
+    <div id="screen-mbti" class="overlay" style="display:none" x-show="$store.ui.showMBTI">
         <h2 style="color:#ccc; margin-bottom:20px">Step 2: 選擇人格特質</h2>
-        <div id="mbti-container" style="display:flex; gap:20px; flex-wrap:wrap; justify-content:center;"></div>
+        <div id="mbti-container" style="display:flex; gap:20px; flex-wrap:wrap; justify-content:center;">
+            <template id="job-template" x-show="$store.ui.showMBTI" x-for="info in $store.data.mbtis">
+            <div class="comp-box" style="width: 250px; cursor: pointer;" @click="finishSetup(info)">
+                <strong class="c-mbti" x-text="info.id + ' ' + info.name">ENTP 辯論家</strong>
+                <br>
+                <span style="font-size:0.8em;color:#aaa" x-text="info.desc">聰明好奇，喜歡挑戰風險。</span>
+                <br>
+                <div style="margin-top:8px;color:#fff;font-size:0.9em" x-text="info.bonusText">敏捷 +2, 智力 +1</div>
+            </div>
+            </template>
+        </div>
     </div>
-    <script type="module" src="./game.js"></script>
 </body>
 </html>

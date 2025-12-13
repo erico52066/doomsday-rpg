@@ -672,6 +672,10 @@ button:disabled {
 	border-radius: 4px;
 }
 
+.comp-box:hover{
+	background: #222;
+}
+
 .diff-up {
 	color: #4f4;
 	font-weight: bold;

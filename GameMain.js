@@ -1,80 +1,42 @@
-// ==================== Data import ====================
-// ==================== 0. 基礎資料庫 ====================
+import * as Constant from './GameData.js';
 
-import MBTI_TYPES from './data/MBTI_TYPES.json' with  { type: "json" };
-// 共通裝備庫：5類 x 5 Tier x 10種 = 250種
-// 格式：[ [Tier1 items...], [Tier2 items...], ... ]
+ document.addEventListener('alpine:init', () => {
+     console.log("Alpine.js initialized");
 
-// 共通裝備庫：5類裝備 + 2類消耗品
-import COMMON_DB from './data/COMMON_DB.json' with  { type: "json" };
-// ==================== 職業專屬裝備庫 (Tier 1 基礎值) ====================
-// 這些是各職業的「本命裝備」，只有該職業能找到。
-// 系統會根據天數自動為它們加上 Tier 前綴 (如 "精工 銀魂武士刀") 並大幅提升數值。
-import JOB_EXCLUSIVE_DB from './data/JOB_EXCLUSIVE_DB.json' with  { type: "json" };
-import ALL_JOBS from './data/ALL_JOBS.json' with  { type: "json" };
-import QUEST_DB from './data/QUEST_DB.json' with  { type: "json" };
-import LOCATIONS from './data/LOCATIONS.json' with  { type: "json" };
-import LOC_EVENT_DB from './data/LOC_EVENT_DB.json' with { type: "json" };
-import AFFIX_DB from './data/AFFIX_DB.json' with { type: "json" };
-import BOSS_LOOT_DB from './data/BOSS_LOOT_DB.json' with { type: "json" };
-import SKILL_DB from './data/SKILL_DB.json' with { type: "json" };
 
-// ==================== 怪物資料庫擴充 ====================
-import ENEMY_PREFIXES from './data/ENEMY_PREFIXES.json' with { type: "json" };
-// 1. 普通怪物庫 (50種, 10 per Tier)
-// 結構: { n:名字, hp:基數, atk:基數, desc:描述, tier:等級 }
-import NORMAL_ENEMIES from './data/NORMAL_ENEMIES.json' with  { type: "json" };
+    Alpine.data('Global', ()=>({
+        updateLog:"12/10/25:新增角色|平衡難度|新增角色裝備|新藥品系統",
+    }));
 
-// 2. 精英怪物庫 (20種, 4 per Tier) - 具備獨特技能
-import ELITE_ENEMIES from './data/ELITE_ENEMIES.json' with  { type: "json" };
+    Alpine.bind('startGame', (diff) => ({
+        type: 'button',
+        '@click'() {
+            startGame(diff);
+        },
+  
+    }));
 
-// 3. 地點專屬 Boss (12地點 x 5 Tier = 60 Bosses)
-// 每個 Boss 至少 2 個技能
-import LOCATION_BOSSES from './data/LOCATION_BOSSES.json' with  { type: "json" };
+    Alpine.bind('selectJob', (job, stat)=>({
+        '@click'(){
+            G.job = job; 
+            G.stats = {...stat}; 
+            showMbti();
+        }
+    }));
 
-import SKILLS from './data/SKILLS.json' with  { type: "json" };
-import MAIN_PLOT from './data/MAIN_PLOT.json' with  { type: "json" };
+    Alpine.store('ui', {
+        showStart:true,
+        showJobSoslection:false,
+        showJobIntros: false,
+        showJobs: false,
+        jobColor: '#f44',
+        showMBTI:false,
+    });
 
-const STAT_MAP = { 
-    s:'力量',
-    a:'敏捷',
-    i:'智力',
-    w:'意志',
-    moral:'道德',
-    luck:'幸運',
-    loot:'掉寶率', // 修改：加個"率"字
-    heal:'回血',
-    san:'SAN',
-    hp:'生命',
-    // ★★★ 新增以下對照 ★★★
-    crit: '暴擊率',
-    dodge: '閃避率',
-    defP: '物理減傷',
-    acc: '命中率',
-    // 裝備部位 (保持不變)
-    melee:'近戰武器',
-    ranged:'遠程武器',
-    acc_slot:'飾品', // 避免與命中率 acc 衝突，這裡改個 key 名稱 (程式碼裡飾品是用 'acc'，需要注意)
-    med:'醫療',
-    head:'頭盔',
-    body:'護甲',
-    shoes:'足部'
-};
+    Alpine.store('data',{
+    })
+ });
 
-// 定義職業專屬裝備的 Tier 前綴與倍率
-const JOB_TIER_PREFIX = [
-    { p: "", mul: 1.0 },              // T1: 0-29 days
-    { p: "改良的 ", mul: 1.5 },       // T2: 30-59 days
-    { p: "精工 ", mul: 2.2 },         // T3: 60-89 days
-    { p: "史詩級 ", mul: 3.5 },       // T4: 90-119 days
-    { p: "覺醒·", mul: 5.5 }          // T5: 120+ days
-];
-
-const EPIC_THEMES = [
-    "🏥 廢棄綜合醫院", "🏫 寂靜的私立高中", "🏢 崩塌的證券交易所", "🎡 鏽蝕的遊樂園", "🕍 古老的山中修道院", 
-    "🏭 洩漏的化工廠", "🚉 地下鐵總站", "🛳️ 擱淺的豪華郵輪", "🏰 歷史博物館", "🏟️ 奧林匹克體育場", 
-    "🚓 警察總部大樓", "🏨 豪華度假酒店", "📡 軍事通訊塔", "🏗️ 未完工的摩天樓", "🌲 變異森林深處"
-];
 
 // 修改：在 storyState 中記錄地點名稱 (loc)，以便結算時發放對應獎勵
 function triggerLocationEvent(locName) {
@@ -100,42 +62,13 @@ function triggerLocationEvent(locName) {
     renderStoryModal();
 }
 
-	// === 新增：職業分類數據 ===
-const RPG_CLASSES = {
-    'warrior': { 
-        label: '🛡️ 鐵衛 (坦克/生存)', 
-        color: '#d96',
-        jobs: ['健身教練', '男護士', 'iBanker', '圍棋棋士', '特教老師'] 
-    },
-    'berserker': { 
-        label: '⚔️ 狂戰 (爆發/力量)', 
-        color: '#f44',
-        jobs: ['圍村村霸', '地盤判頭', '三星廚師', '地產商', 'Cosplayer'] 
-    },
-    'ranger': { 
-        label: '🏹 遊俠 (敏捷/暴擊)', 
-        color: '#4f4',
-        jobs: ['電競選手', '飛鏢運動員', 'F1賽車手', '造型師', '警察', '外送員', 'Popper'] 
-    },
-    'mage': { 
-        label: '🔮 秘法 (智力/控制)', 
-        color: '#4cf',
-        jobs: ['Tesla工程師', 'Nvidia工程師', '道士', '心理醫生', '攝影師', '神學家', '數學家', '黑客'] 
-    },
-    'special': { 
-        label: '🦄 特殊 (機制/運氣)', 
-        color: '#ffd700',
-        jobs: ['機械師', '小學生', '莊家', '賭場荷官', '精算師', '園藝師', '追星族', '電商大佬']
-    }
-};
-
 // ==================== 1. 遊戲核心變數 ====================
 // 1. 替換 let G = { ... }
 let G = { 
     day:0, maxDay:196, diff:1, hp:100, maxHp:100, san:100, food:100, water:100, ammo:0, 
     level:1, xp:0, nextLvl:20, money: 100, // 新增 money
-    stats:{s:0,a:0,i:0,w:0}, 
-    moral: 50, luck: 10,
+    stats:{str:0,agi:0,int:0,wil:0}, 
+    moral: 50, luck: 10, hpPenalty: 0,
     eq:{melee:null, ranged:null, head:null, body:null, acc:null}, 
     bag: [], // 新增 bag
     shop: { items: [], lastDay: -1, isBlackMarket: false }, // 新增 shop
@@ -147,86 +80,20 @@ let G = {
 // 2. 替換 startGame 函數 (確保重置所有數據)
 function startGame(diff) {
     G.diff = diff;
-    G.day = 0; G.hp = 100; G.san = 100; G.food = 100; G.water = 100; G.ammo = 0; G.alive = true;
-    G.stats = {s:0,a:0,i:0,w:0}; G.moral = 50; G.luck = 10;
-    G.level = 1; G.xp = 0;
-	G.hpPenalty = 0;
-    
-    // --- 新增重置邏輯 ---
     G.money = (diff === 3) ? 50 : 100; // 噩夢開局錢少
-    G.bag = [];
-    G.shop = { items: [], lastDay: -1, isBlackMarket: false };
     // ------------------
 
-    G.storyOrder = [...Array(EPIC_THEMES.length).keys()].sort(() => 0.5 - Math.random());
+    G.storyOrder = [...Array(Constant.EPIC_THEMES.length).keys()].sort(() => 0.5 - Math.random());
     G.activeQuest = null;
-    
-    document.getElementById('screen-start').style.display = 'none';
-    
-    renderJobIntro(); 
-    document.getElementById('screen-jobs').style.display = 'flex';
-}
 
-
-// === 新增：初始引導畫面 ===
-function renderJobIntro() {
-    // 1. 清除所有按鈕的高亮狀態 (重置為預設)
-    const allTabs = ['warrior', 'berserker', 'ranger', 'mage', 'special'];
-    allTabs.forEach(tab => {
-        let btn = document.getElementById('tab-' + tab);
-        if (btn) {
-            btn.style.backgroundColor = '#252525';
-            btn.style.color = RPG_CLASSES[tab].color;
-            btn.style.fontWeight = 'normal';
-            btn.style.boxShadow = 'none';
-            btn.style.opacity = '0.7'; // 稍微變暗，暗示未選中
-        }
-    });
-
-    // 2. 獲取容器並清空
-    let container = document.getElementById('job-container');
-    container.innerHTML = '';
-    
-    // 3. 插入引導文字 (使用 Flex 居中顯示)
-    // 這裡我們把容器暫時改為 flex 布局以便居中，點擊按鈕後 renderJobs 會改回 grid
-    container.style.display = 'flex';
-    container.style.flexDirection = 'column';
-    container.style.alignItems = 'center';
-    container.style.justifyContent = 'center';
-    
-    let html = `
-        <div style="text-align:center; padding:20px; color:#aaa;">
-            <h3 style="margin-bottom:20px; color:#fff;">請點擊上方按鈕選擇系別</h3>
-            <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap:15px; text-align:left; width:100%; max-width:600px;">
-                <div style="border-left:3px solid #aaa; padding-left:10px;">
-                    <strong style="color:#d96">🛡️ 鐵衛</strong><br>
-                    <span style="font-size:0.8em">高生存、防禦、格擋、回血。</span>
-                </div>
-                <div style="border-left:3px solid #f44; padding-left:10px;">
-                    <strong style="color:#f44">⚔️ 狂戰</strong><br>
-                    <span style="font-size:0.8em">高爆發、以血換血、燃燒。</span>
-                </div>
-                <div style="border-left:3px solid #4f4; padding-left:10px;">
-                    <strong style="color:#4f4">🏹 遊俠</strong><br>
-                    <span style="font-size:0.8em">高敏捷、閃避、暴擊、連擊。</span>
-                </div>
-                <div style="border-left:3px solid #4cf; padding-left:10px;">
-                    <strong style="color:#4cf">🔮 秘法</strong><br>
-                    <span style="font-size:0.8em">高智力、控制(暈/睡)、異常狀態。</span>
-                </div>
-                <div style="border-left:3px solid #ffd700; padding-left:10px;">
-                    <strong style="color:#ffd700">🦄 特殊</strong><br>
-                    <span style="font-size:0.8em">召喚、金錢攻擊、運氣機制。</span>
-                </div>
-            </div>
-            <p style="margin-top:30px; font-size:0.9em; color:#666;">點擊上方按鈕即可查看詳細角色數值</p>
-        </div>
-    `;
-    
-    container.innerHTML = html;
+    Alpine.store('ui').showStart = false;
+    Alpine.store('ui').showJobIntros = true;
+    Alpine.store('ui').showJobSelection = true;
 }
 
 function renderJobs(category) {
+    Alpine.store('ui').showJobIntros = false;
+    Alpine.store('ui').showJobs = true;
     // 1. 處理按鈕高亮樣式 (UI回饋)
    const allTabs = ['warrior', 'berserker', 'ranger', 'mage', 'special'];
     allTabs.forEach(tab => {
@@ -234,15 +101,15 @@ function renderJobs(category) {
         if (btn) {
             if (tab === category) {
                 // 選中
-                btn.style.backgroundColor = RPG_CLASSES[tab].color;
+                btn.style.backgroundColor = Constant.RPG_CLASSES[tab].color;
                 btn.style.color = '#000'; 
                 btn.style.fontWeight = 'bold';
-                btn.style.boxShadow = `0 0 10px ${RPG_CLASSES[tab].color}`;
+                btn.style.boxShadow = `0 0 10px ${Constant.RPG_CLASSES[tab].color}`;
                 btn.style.opacity = '1';
             } else {
                 // 未選中
                 btn.style.backgroundColor = '#252525';
-                btn.style.color = RPG_CLASSES[tab].color;
+                btn.style.color = Constant.RPG_CLASSES[tab].color;
                 btn.style.fontWeight = 'normal';
                 btn.style.boxShadow = 'none';
                 btn.style.opacity = '0.6'; // 未選中變暗
@@ -250,77 +117,52 @@ function renderJobs(category) {
         }
     });
 
-    // 2. 獲取容器並清空
+    // 2. 獲取容器
     let container = document.getElementById('job-container');
-    container.innerHTML = '';
     
 	// ★★★ 新增：將容器樣式還原為 Grid (因為 Intro 頁面把它改成了 Flex) ★★★
     container.style.display = 'grid';
     container.style.flexDirection = 'unset';
     container.style.alignItems = 'unset';
     container.style.justifyContent = 'unset';
-    // ===============================================================
-
-    // 3. 獲取該分類的數據
-    const group = RPG_CLASSES[category];
     
-    // 4. 過濾職業
-    let pool = ALL_JOBS.filter(j => 
-        group.jobs.some(targetName => j.n.includes(targetName)) && !j.n.includes('Lil Kid')
+    const group = Constant.RPG_CLASSES[category];
+    let pool = Constant.ALL_JOBS.filter(job => 
+        group.jobs.some(targetName => job.name.includes(targetName)) && !job.name.includes('Lil Kid')
     );
-
-    // 5. 生成卡片 (Grid Item)
-    pool.forEach(j => {
-        let div = document.createElement('div');
-        div.className = 'comp-box'; 
-        div.style.cursor = 'pointer';
-        div.style.textAlign = 'left';
-        div.style.border = `1px solid ${group.color}`; // 邊框跟隨分類顏色
-        div.style.display = 'flex';
-        div.style.flexDirection = 'column';
-        div.style.justifyContent = 'space-between';
-        
-        // 懸停效果
-        div.onmouseover = () => { div.style.backgroundColor = '#222'; };
-        div.onmouseout = () => { div.style.backgroundColor = '#080808'; };
-        
-        let statText = `<span style="color:#f66">力${j.s.s}</span> <span style="color:#4f4">敏${j.s.a}</span> <span style="color:#4cf">智${j.s.i}</span> <span style="color:#f4f">意${j.s.w}</span>`;
-        
-        div.innerHTML = `
-            <div>
-                <div class="q3" style="font-size:1.1em; margin-bottom:8px; color:${group.color}; text-shadow:none;">${j.n}</div>
-                <div style="font-size:0.9em; margin-bottom:8px; background:#1a1a1a; padding:4px; border-radius:3px; text-align:center;">${statText}</div>
-                <div style="font-size:0.85em; color:#ccc; line-height:1.5;">${j.desc}</div>
-            </div>
-            <div style="margin-top:10px; font-size:0.8em; color:#666; text-align:right;">
-                特質: ${j.trait}
-            </div>
-        `;
-        
-        div.onclick = () => { G.job = j; G.stats = {...j.s}; showMbti(); };
-        container.appendChild(div);
-    });
+    
+    pool.forEach(job=>job.color = group.color);
+    Alpine.store('data').jobs = pool;
+    return;
 }
+
 function showMbti() {
-    document.getElementById('screen-jobs').style.display = 'none';
-    let c = document.getElementById('mbti-container');
-    c.innerHTML = '';
-    let choices = MBTI_TYPES.sort(()=>0.5-Math.random()).slice(0, 2);
+    Alpine.store('ui').showJobSelection = false;
+    Alpine.store('ui').showMBTI = true;
+    let choices = Constant.MBTI_TYPES.sort(()=>0.5-Math.random()).slice(0, 2);
+    // document.getElementById('screen-jobs').style.display = 'none';
+    // let c = document.getElementById('mbti-container');
+    // c.innerHTML = '';
+    // let choices = Constant.MBTI_TYPES.sort(()=>0.5-Math.random()).slice(0, 2);
     choices.forEach(m => {
         let bonusText = [];
         for(let k in m.bonus) {
             let val = m.bonus[k];
-            let label = STAT_MAP[k] || k;
+            let label = Constant.STAT_MAP[k] || k;
             if(val < 1 && val > -1) val = Math.floor(val*100) + '%';
             bonusText.push(`${label} +${val}`);
         }
-        let div = document.createElement('div');
-        div.className = 'comp-box'; div.style.width='250px'; div.style.cursor='pointer';
-        div.innerHTML = `<strong class="c-mbti">${m.id} ${m.name}</strong><br><span style="font-size:0.8em;color:#aaa">${m.desc}</span><br><div style="margin-top:8px;color:#fff;font-size:0.9em">${bonusText.join(', ')}</div>`;
-        div.onclick = () => { finishSetup(m); };
-        c.appendChild(div);
+        m.bonusText = bonusText.join(', ');
+        
+        // let div = document.createElement('div');
+        // div.className = 'comp-box'; div.style.width='250px'; div.style.cursor='pointer';
+        // div.innerHTML = `<strong class="c-mbti">${m.id} ${m.name}</strong><br><span style="font-size:0.8em;color:#aaa">${m.desc}</span><br><div style="margin-top:8px;color:#fff;font-size:0.9em">${bonusText.join(', ')}</div>`;
+        // div.onclick = () => { finishSetup(m); };
+        // c.appendChild(div);
     });
-    document.getElementById('screen-mbti').style.display = 'flex';
+    // document.getElementById('screen-mbti').style.display = 'flex';
+    Alpine.store('data').mbtis = choices;
+
 }
 
 function finishSetup(m) {
@@ -332,7 +174,7 @@ function finishSetup(m) {
     
     }
 
-    let g = G.job.g; // g[0]=melee name, g[1]=ranged name...
+    let g = G.job.equip; // g[0]=melee name, g[1]=ranged name...
     // 強制生成 Tier 1 的職業裝備
     G.eq.melee = createItem('melee', g[0], 1, false); 
     G.eq.ranged = createItem('ranged', g[1], 1, false); 
@@ -360,7 +202,7 @@ function finishSetup(m) {
     recalcMaxHp(); 
     G.hp = G.maxHp; 
 
-    updateUI();
+    // updateUI();
     showPlotDialog(1, showJobIntro);
 }
 
@@ -560,14 +402,6 @@ function openCampBag() {
         return;
     }
 
-    // 定義屬性名稱映射
-    const STAT_MAP_CN = {
-        s:'力量', a:'敏捷', i:'智力', w:'意志',
-        luck:'幸運', hp:'生命', san:'SAN',
-        crit:'暴擊', dodge:'閃避', defP:'減傷', acc:'命中',
-        heal:'回復'
-    };
-
     let html = `<div style="display:grid; gap:8px; max-height:60vh; overflow-y:auto;">`;
     G.bag.forEach((item, idx) => {
         let descriptions = [];
@@ -586,7 +420,7 @@ function openCampBag() {
                 if(k === 'desc' || k === 'eff' || k === 'all') continue;
                 let v = item.stats[k];
                 if(v === 0) continue;
-                let name = STAT_MAP_CN[k] || k;
+                let name = Constant.STAT_MAP[k] || k;
                 let sign = v > 0 ? '+' : '';
                 
                 // ★★★ 新增：提示判定邏輯 ★★★
@@ -747,7 +581,7 @@ function campAction(act) {
     } else if(act==='train') {
         if(G.water<30) { log('提示','水不足'); return; }
         G.water-=30; let s=['s','a','i'][Math.floor(Math.random()*3)]; G.stats[s]++;
-        log('訓練',`${STAT_MAP[s]} +1`,'c-gain');
+        log('訓練',`${Constant.STAT_MAP[s]} +1`,'c-gain');
     }
     campPhase(); 
 }
@@ -770,7 +604,7 @@ function checkLevelUp() {
         let s = stats[Math.floor(Math.random()*stats.length)];
         G.stats[s]++;
         
-        let statName = STAT_MAP[s];
+        let statName = Constant.STAT_MAP[s];
         openModal("✨ 升級！", 
             `<h2 style="color:var(--xp-color)">Level ${G.level}</h2>
             <div>狀態完全恢復！</div>
@@ -809,9 +643,9 @@ function startEpicStory() {
         };
     } else {
         // 沒有任務時，使用原有的隨機地點邏輯
-        let idx = G.storyOrder[(Math.floor(G.day/7) - 1) % EPIC_THEMES.length];
+        let idx = G.storyOrder[(Math.floor(G.day/7) - 1) % Constant.EPIC_THEMES.length];
         if(idx === undefined) idx = 0; 
-        let theme = EPIC_THEMES[idx];
+        let theme = Constant.EPIC_THEMES[idx];
         
         storyData = {
             title: `📅 第 ${Math.ceil(G.day/7)} 週：${theme}`,
@@ -965,7 +799,7 @@ function renderStoryModal(showingResult = false) {
                     <span style="color:${rateColor}; font-weight:bold">${chance}%</span>
                 </div>
                 <div style="font-size:0.75em; color:#666; text-align:left; margin-top:2px">
-                    檢定: ${STAT_MAP[statKey] || statKey}
+                    檢定: ${Constant.STAT_MAP[statKey] || statKey}
                 </div>
              </button>`;
         }
@@ -1518,7 +1352,7 @@ function showQuestDetail() {
     // 如果目前已經接了任務，顯示當前任務狀態
     if (G.activeQuest) {
         let q = G.activeQuest;
-        let rewardName = STAT_MAP[q.reward.type] || "物資";
+        let rewardName = Constant.STAT_MAP[q.reward.type] || "物資";
         
         let html = `
             <div style="padding:10px;">
@@ -2293,7 +2127,7 @@ function combatRound(act) {
     if(G.job.passive === 'random_buff') {
         let stat = ['s','a','i','w','luck'][Math.floor(Math.random()*5)];
         G.stats[stat] = Math.floor((G.stats[stat]||0) * 1.1);
-        logMsg.push(`諾貝爾獎: ${STAT_MAP[stat]}提升`);
+        logMsg.push(`諾貝爾獎: ${Constant.STAT_MAP[stat]}提升`);
     }
 
     let derived = calcDerivedStats(); // 重新獲取 (包含 SAN 加成)
@@ -3996,7 +3830,7 @@ function showItemDetail(type) {
             
             let val = i.stats[k];
             // 將代碼轉為中文 (STAT_MAP 已經定義了大部分)
-            let name = STAT_MAP[k] || k;
+            let name = Constant.STAT_MAP[k] || k;
             
             // 特殊處理百分比數值 (如 defP, dodge)
             if (['defP', 'dodge', 'crit', 'loot'].includes(k) || (val < 1 && val > -1)) {
@@ -5296,13 +5130,14 @@ const globalFunctions = {
     nextStoryStep,
     openCampBag,
     renderJobs,
-    renderJobIntro,
+    // renderJobIntro,
     debugCheat,
     triggerShake,
     pickUpBossLoot, 
     closeBossLoot, 
     openSkillMenu,
     performSkill,
+    finishSetup
 };
 
 Object.assign(window, globalFunctions);

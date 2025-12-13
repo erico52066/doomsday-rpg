@@ -1,18 +1,18 @@
 [
-    { "id":"INTJ", "name":"建築師", "bonus":{"i":2,"san":2}, "desc":"深思熟慮，善於制定長遠計劃。" }, 
-    { "id":"INTP", "name":"邏輯學家", "bonus":{"i":3}, "desc":"對知識有止境的渴望，分析力強。" }, 
-    { "id":"ENTJ", "name":"指揮官", "bonus":{"s":1,"a":1,"i":1}, "desc":"大膽的領導者，能發現機會。" }, 
-    { "id":"ENTP", "name":"辯論家", "bonus":{"a":2,"i":1}, "desc":"聰明好奇，喜歡挑戰風險。" },
+    { "id":"INTJ", "name":"建築師", "bonus":{"int":2,"san":2}, "desc":"深思熟慮，善於制定長遠計劃。" }, 
+    { "id":"INTP", "name":"邏輯學家", "bonus":{"int":3}, "desc":"對知識有止境的渴望，分析力強。" }, 
+    { "id":"ENTJ", "name":"指揮官", "bonus":{"str":1,"agi":1,"int":1}, "desc":"大膽的領導者，能發現機會。" }, 
+    { "id":"ENTP", "name":"辯論家", "bonus":{"agi":2,"int":1}, "desc":"聰明好奇，喜歡挑戰風險。" },
     { "id":"INFJ", "name":"提倡者", "bonus":{"san":5}, "desc":"安靜而神秘，但非常鼓舞人心。" }, 
     { "id":"INFP", "name":"調停者", "bonus":{"heal":2}, "desc":"詩意，善良的利他主義者。" }, 
     { "id":"ENFJ", "name":"主人公", "bonus":{"loot":0.1}, "desc":"富有魅力，能感召人心。" }, 
     { "id":"ENFP", "name":"競選者", "bonus":{"loot":0.2}, "desc":"熱情，有創造力，運氣好。" },
-    { "id":"ISTJ", "name":"物流師", "bonus":{"s":1,"i":1}, "desc":"注重事實，可靠的現實主義者。" }, 
+    { "id":"ISTJ", "name":"物流師", "bonus":{"str":1,"int":1}, "desc":"注重事實，可靠的現實主義者。" }, 
     { "id":"ISFJ", "name":"守衛者", "bonus":{"defP":0.1}, "desc":"非常專注而溫暖的守護者。" }, 
-    { "id":"ESTJ", "name":"總經理", "bonus":{"s":2}, "desc":"出色的管理者，力量驚人。" }, 
+    { "id":"ESTJ", "name":"總經理", "bonus":{"str":2}, "desc":"出色的管理者，力量驚人。" }, 
     { "id":"ESFJ", "name":"執政官", "bonus":{"hp":20}, "desc":"極度關懷他人，生命力強。" }, 
     { "id":"ISTP", "name":"鑑賞家", "bonus":{"crit":5}, "desc":"大膽而實際的實驗家。" }, 
     { "id":"ISFP", "name":"探險家", "bonus":{"dodge":5}, "desc":"靈活有魅力的藝術家。" }, 
     { "id":"ESTP", "name":"企業家", "bonus":{"dmgP":0.1}, "desc":"聰明，精力充沛，喜歡冒險。" }, 
-    { "id":"ESFP", "name":"表演者", "bonus":{"a":3}, "desc":"精力充沛，敏捷過人。" }
+    { "id":"ESFP", "name":"表演者", "bonus":{"agi":3}, "desc":"精力充沛，敏捷過人。" }
 ]
