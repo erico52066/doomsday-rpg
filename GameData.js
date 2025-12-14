@@ -112,3 +112,12 @@ export const RPG_CLASSES = {
         jobs: ['機械師', '小學生', '莊家', '賭場荷官', '精算師', '園藝師', '追星族', '電商大佬']
     }
 };
+
+// 定義地點的預設獎勵類型
+export const LOC_REWARDS = {
+    "廢棄超市": "food", "民居": "food", "下水道": "random",
+    "五金店": "melee", "健身房": "melee",
+    "警局分局": "ranged", "服裝店": "body",
+    "診所": "med", "公園": "water",
+    "銀行": "acc", "電子城": "acc", "學校": "acc"
+};

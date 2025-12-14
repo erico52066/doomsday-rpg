@@ -31,23 +31,24 @@
     <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.15.2/dist/cdn.min.js"></script>
 </head>
 <body x-data="Global">
-    <div id="game-container" style="display:none">
+    <!-- Main Game Screen-->
+    <div id="game-container" style="display:none" x-show="$store.ui.showGameScreen">
         <div id="weather-bar">
-            <span id="w-text">☀️ 晴朗</span></span>
+            <span id="w-text" x-text="$store.ui.weather">☀️ 晴朗</span></span>
             <button id="quest-btn" type="button" onclick="showQuestDetail()">📜 任務資訊</button>
-            <span><span id="v-job" style="color:var(--r-rare)"></span> / <span id="v-mbti" class="c-mbti"></span> <span id="v-status-extra" style="color:#f44"></span></span>
+            <span><span id="v-job" style="color:var(--r-rare)" x-text="$store.Game.State?.job?.name??'N/A'"></span> / <span id="v-mbti" class="c-mbti" x-text="$store.Game.State?.mbti?.id?? 'N/A'"></span> <span id="v-status-extra" style="color:#f44" x-text="$store.Game.State?.flag?.depression"></span></span>
         </div>
 
         <div id="header">
             <button id="stat-btn" type="button" onclick="collapseStat()">🔽 現在資訊</button>
             <div id="stat-bar">
-                <div class="stat-box"><span class="stat-lbl">Day</span><span class="stat-val" id="v-day">0</span></div>
-                <div class="stat-box"><span class="stat-lbl">HP</span><span class="stat-val" style="color:var(--hp-color)"><span id="v-hp">100</span>/<span id="v-max-hp">100</span></span></div>
-                <div class="stat-box"><span class="stat-lbl">SAN</span><span class="stat-val" style="color:var(--san-color)" id="v-san">100</span></div>
-                <div class="stat-box" onclick="showStats()"><span class="stat-lbl">Lv. <span id="v-lvl" style="color:#fff">1</span></span><span class="stat-val" id="v-stats">屬性</span></div>
-                <div class="stat-box"><span class="stat-lbl">XP</span><span class="stat-val" id="v-xp" style="color:var(--xp-color)">0/20</span></div>
-                <div class="stat-box"><span class="stat-lbl">物資</span><span class="stat-val"><span id="v-food-icon">🍖</span><span id="v-food">100</span>/<span id="v-water-icon">💧</span><span id="v-water">100</span></span></div>
-                <div class="stat-box"><span class="stat-lbl">💰 金錢</span><span class="stat-val" id="v-money" style="color:#ffd700">0</span></div>
+                <div class="stat-box"><span class="stat-lbl">Day</span><span class="stat-val" id="v-day" x-text="$store.Game.State?.day">0</span></div>
+                <div class="stat-box"><span class="stat-lbl">HP</span><span class="stat-val" style="color:var(--hp-color)"><span id="v-hp" x-text="$store.Game.State?.hp">100</span>/<span id="v-max-hp" x-text="$store.Game.State?.maxHp">100</span></span></div>
+                <div class="stat-box"><span class="stat-lbl">SAN</span><span class="stat-val" style="color:var(--san-color)" id="v-san" x-text="$store.data.sanState?.text" :style="{color: $store.data.sanState?.color}">100</span></div>
+                <div class="stat-box" onclick="showStats()"><span class="stat-lbl" x-text="$store.Game.State?.level">Lv. <span id="v-lvl" style="color:#fff">1</span></span><span class="stat-val" id="v-stats">屬性</span></div>
+                <div class="stat-box"><span class="stat-lbl">XP</span><span class="stat-val" id="v-xp" style="color:var(--xp-color)" x-text="$store.Game.State?.xp">0/20</span></div>
+                <div class="stat-box"><span class="stat-lbl">物資</span><span class="stat-val"><span id="v-food-icon">🍖</span><span id="v-food" x-text="$store.Game.State?.food">100</span>/<span id="v-water-icon">💧</span><span id="v-water" x-text="$store.Game.State?.water">100</span></span></div>
+                <div class="stat-box"><span class="stat-lbl">💰 金錢</span><span class="stat-val" id="v-money" style="color:#ffd700" x-text="$store.Game.State?.money">0</span></div>
             </div>
         </div>
         
@@ -55,33 +56,164 @@
             <button id="equip-btn" type="button" onclick="collapseEquip()">🔽 裝備</button>
             <div id="equip-container">
                 <div class="eq-row" onclick="showItemDetail('melee')">
-                    <span class="eq-label">⚔️ 近戰</span><span id="eq-melee" class="eq-val q0">(未裝備)</span>
+                    <span class="eq-label">⚔️ 近戰</span><span id="eq-melee" class="eq-val" :class="'q' + $store.Game.State?.eq.melee?.rarity" x-text="$store.Game.State?.eq.melee?.fullName">(未裝備)</span>
                     <div id="tag-melee" class="mastery-tag" style="display:none">專精</div>
                 </div>
                 <div class="eq-row" onclick="showItemDetail('ranged')">
-                    <span class="eq-label">🔫 遠程</span><span class="eq-val"><span id="eq-ranged" class="q0">(未裝備)</span> <span id="v-ammo" style="color:#666;font-size:0.8em;font-weight:normal">(0)</span></span>
+                    <span class="eq-label">🔫 遠程</span><span class="eq-val"><span id="eq-ranged" :class="'q' + $store.Game.State?.eq.ranged?.rarity" x-text="$store.Game.State?.eq.ranged?.fullName">(未裝備)</span> <span id="v-ammo" style="color:#666;font-size:0.8em;font-weight:normal" x-text="'(' + $store.Game.State?.ammo + ')'">(0)</span></span>
                     <div id="tag-ranged" class="mastery-tag" style="display:none">專精</div>
                 </div>
-                <div class="eq-row" onclick="showItemDetail('head')"><span class="eq-label">🪖 頭部</span><span id="eq-head" class="eq-val q0">(未裝備)</span></div>
-                <div class="eq-row" onclick="showItemDetail('body')"><span class="eq-label">👕 身體</span><span id="eq-body" class="eq-val q0">(未裝備)</span></div>
-                <div class="eq-row" onclick="showItemDetail('acc')"><span class="eq-label">💍 飾品</span><span id="eq-acc" class="eq-val q0">(未裝備)</span></div>
-                <div class="eq-row" onclick="showItemDetail('shoes')"><span class="eq-label">👢 足部</span><span id="eq-shoes" class="eq-val q0">(未裝備)</span></div>
+                <div class="eq-row" onclick="showItemDetail('head')"><span class="eq-label">🪖 頭部</span><span id="eq-head" class="eq-val q0" :class="'q' + $store.Game.State?.eq.head?.rarity" x-text="$store.Game.State?.eq.head?.fullName">(未裝備)</span></div>
+                <div class="eq-row" onclick="showItemDetail('body')"><span class="eq-label">👕 身體</span><span id="eq-body" class="eq-val q0" :class="'q' + $store.Game.State?.eq.body?.rarity" x-text="$store.Game.State?.eq.body?.fullName">(未裝備)</span></div>
+                <div class="eq-row" onclick="showItemDetail('acc')"><span class="eq-label">💍 飾品</span><span id="eq-acc" class="eq-val q0" :class="'q' + $store.Game.State?.eq.acc?.rarity" x-text="$store.Game.State?.eq.acc?.fullName">(未裝備)</span></div>
+                <div class="eq-row" onclick="showItemDetail('shoes')"><span class="eq-label">👢 足部</span><span id="eq-shoes" class="eq-val q0" :class="'q' + $store.Game.State?.eq.shoes?.rarity" x-text="$store.Game.State?.eq.shoes?.fullName">(未裝備)</span></div>
             </div>
         </div>
 
-    <!-- ★★★敵人專屬區域 ★★★ -->
-        <div id="enemy-area" style="display:none"></div>
-
+        <!-- ★★★敵人專屬區域 ★★★ -->
+        <div id="enemy-area" style="display:block" x-show="$store.ui.showEnemy">
+            <div class="enemy-visual">
+                <div class="enemy-avatar" x-text="$store.enemy.avatar">💀</div>
+            </div>
+            <div class="enemy-hud">
+                <div class="hud-row">
+                    <span style="font-size:1.2em; font-weight:bold; color:#f66; text-shadow:0 0 5px #500" x-text="$store.enemy.name">鏡中人</span>
+                    <span style="font-family:'Consolas'; color:#fff" x-text="$store.enemy.status?.hp">78 <span style="color:#666" x-text="$store.enemy.status?.maxHp">/ 78</span></span>
+                </div>
+                <div class="hp-bar-container"><div class="hp-bar-fill" style="width: 100%" :style="{width: $store.enemy.hpPercent}"></div></div>
+                
+                <!-- 更新後的數值面板 -->
+                <div class="stat-grid-compact" style="background:rgba(0,0,0,0.5); margin-top:5px;">
+                    <div>⚔️ <span style="color:#ccc" x-text="$store.enemy.atk">9</span></div>
+                    <div>🛡️ <span style="color:#ccc" x-text="$store.enemy.def">3</span></div>
+                    <div>💨 <span style="color:#ccc" x-text="$store.enemy.dodge">5%</span></div>
+                </div>
+                
+                <div class="buff-row">
+                    <template id="buff-template" x-for="buff in $store.enemy.buffs">
+                        <span style="color:#444;font-size:0.8em" x-text="buff">無狀態</span>
+                    </template>
+                </div>
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-top:5px; border-top:1px dashed #333; padding-top:3px">
+                    <template id="enemy-skill" x-for="skill in $store.enemy.status?.sks">
+                        <div><span class="skill-tag" style="font-size:0.75em" x-text="skill.n">鏡像複製</span></div>
+                        <div style="font-size:0.8em"><span class="cd-alert" style="color:#666" x-text="skill.enemySkillCD > 0 ? 'CD: ' + c.enemySkillCD : '⚠️準備就緒'">⚠️準備就緒</span></div>
+                    </template>
+                </div>
+            </div>
+        </div>
         <div id="log-area"></div>
-        <div id="action-area"></div>
+        <div id="action-area">
+            <!-- Camp action-->
+            <div style="text-align:center; margin-bottom:10px; color:#fff" x-text="'⛺ 營地 Day ' + $store.Game.State?.day" x-show="$store.ui.showCampAction && !$store.ui.showEnemy">⛺ 營地 Day 8</div>
+            <div class="btn-grid" x-show="$store.ui.showCampAction">
+                <button onclick="exploreSetup()">
+                    🗺️ 外出探索
+                    <br>
+                    <span style="font-size:0.8em;color:#aaa">精力-20</span>
+                </button>
+                <button onclick="campAction('rest')">
+                    💤 休息
+                    <br>
+                    <span style="font-size:0.8em;color:#aaa">食物-20</span>
+                </button>
+                <button onclick="campAction('water')">
+                    💧 尋水
+                    <br>
+                    <span style="font-size:0.8em;color:#aaa">精力-15</span>
+                </button>
+                <button onclick="campAction('train')">
+                    🏋️ 訓練
+                    <br>
+                    <span style="font-size:0.8em;color:#aaa">水-30</span>
+                </button>
+                <button onclick="openCampBag()">
+                    🎒 查看背包
+                    <br>
+                    <span style="font-size:0.8em;color:#aaa" x-text="$store.ui.bagCapacity">(0/9)</span>
+                </button>
+                <button onclick="openShop()">
+                    🛒 營地商店
+                    <br>
+                    <span style="font-size:0.8em;color:#ffd700">2%黑市</span>
+                </button>
+            </div>
+            <!-- Explore -->
+            <div style="margin-bottom:5px; color:#fff" x-show="!$store.ui.showCampAction && !$store.ui.showEnemy">
+                📍 選擇地點: 
+                <button onclick="renderCampActions()" style="display:inline-block;padding:2px 5px;width:auto;">↩️</button>
+            </div>
+            <div class="grid-3x3" x-show="!$store.ui.showCampAction && !$store.ui.showEnemy">
+                <template id="explore-loc" x-for="loc in $store.ui.exploreLoc" x-show="!$store.ui.showCampAction && !$store.ui.showEnemy">
+                    <button class="loc-btn" @click="loc.trigger" x-show="!$store.ui.showCampAction">
+                        <div class="loc-name" x-text="loc.name">服裝店</div>
+                        <div class="loc-info">
+                            <span class="loc-danger d-low" :class="loc.class" :style="loc.style" x-text="loc.riskText">危:低</span>
+                            <span x-text="loc.desc">衣物</span>
+                        </div>
+                    </button>
+                </template>
+            </div>
+            <!-- Combat -->
+            <div style="background:#161616; padding:10px; border-radius:4px; border:1px solid #333; margin-bottom:10px;" x-show="$store.ui.showEnemy">
+                <!-- 名字與狀態 -->
+                <div style="font-size:0.95em; color:#fff; margin-bottom:5px; display:flex; justify-content:space-between; align-items:center;">
+                    <span style="font-weight:bold" x-text="'👤 '+$store.Game.State?.job.name+'(Lv.'+$store.Game.State?.level+')'">👤 undefined (Lv.1)</span>
+                    <span style="font-size:0.9em">
+                        <template id="player-status" x-for="status in $store.ui.playerStatus">
+                            <span class="buff-badge" style="color:#fa0;border-color:#fa0" :style="{color:status.color;'border-color':status.color}" x-text="status.text">⚡暈眩(${safeDebuffs.stun})</span>
+                        </template>
+                    </span>
+                </div>
+
+                <!-- ★★★ 新增：玩家血條區域 ★★★ -->
+                <div style="margin-bottom:8px;">
+                    <div style="display:flex; justify-content:space-between; font-size:0.8em; color:#ccc; margin-bottom:2px;">
+                        <span>HP</span>
+                        <span x-text="$store.Game.State?.hp+' / '+$store.Game.State?.maxHp">100 / 100</span>
+                    </div>
+                    <div class="hp-bar-container">
+                        <div class="hp-bar-fill" style="width: 100%; background: linear-gradient(90deg, #4f4, #0a0);" :style="{width:$store.player.hpPercent,'linear-gradient':$store.player.hpColor}"></div>
+                    </div>
+                </div>
+                <!-- ★★★ 結束 ★★★ -->
+                <div style="display:grid; grid-template-columns: repeat(2, 1fr); gap:8px; font-size:0.85em; text-align:center;">
+                    <div style="background:#222; padding:3px; border-radius:3px;" x-text="'近戰: ' + $store.player.melee">近戰: 24</div>
+                    <div style="background:#222; padding:3px; border-radius:3px;" x-text="'遠程: ' + $store.player.ranged">遠程: 30</div>
+                </div>
+            </div>
+            <div class="combat-grid" x-show="$store.ui.showEnemy && !$store.player.stuned">
+                <button onclick="combatRound('melee')">⚔️ 近戰</button>
+                <button onclick="combatRound('ranged')" :disabled="$store.Game.State?.ammo<0" x-text="'🔫 射擊 ('+$store.Game.State?.ammo+')'">🔫 射擊 (10)</button>
+                
+                <!-- ★★★ 這裡插入剛剛生成的技能按鈕變數 ★★★ -->
+                <button @click="$store.player.skillAction" :disabled="$store.Game.State?.silence> 0">
+                    <div style="font-weight:bold" x-text="$store.player.skillText">⚡ 技能 (1)</div>
+                    <div style="font-size:0.75em;color:#d0f" x-text="$store.player.skillStatus">就緒</div>
+                </button>
+                
+                <button onclick="combatRound('defend')" style="border-color:#55aaff" :disabled="$store.Game.State?.playerDefCD> 0" x-text="'🛡️ 防禦 (CD:'+$store.Game.State?.playerDefCD+')'">🛡️ 防禦 (CD:0)</button>
+                <button class="combat-full-width" onclick="openCombatBag()" x-text="'🎒 戰鬥物品 ('+$store.Game.State?.bag.length+')'">🎒 戰鬥物品 (0)</button>
+                <button class="combat-full-width" onclick="combatRound('flee')">🏃 逃跑</button>
+            </div>
+            <div class="combat-grid" x-show="$store.ui.showEnemy && $store.player.stuned">
+            <button class="combat-full-width" onclick="combatRound('skip')" style="border-color:#fa0; color:#fa0; height:100px; font-size:1.2em;">
+                ⚡ 你被擊暈了！<br><span style="font-size:0.8em; color:#fff">(點擊跳過回合)</span>
+            </button>
+        </div>
+        </div>
     </div>
 
     <!-- Modal -->
-    <div id="screen-modal" class="overlay" style="display:none" >
+    <div id="screen-modal" class="overlay" style="display:flex" x-show="$store.ui.showModal">
         <div id="modal-content" onclick="event.stopPropagation()">
-            <h2 id="m-title" style="margin:0 0 10px 0; color:#fff"></h2>
-            <div id="m-desc" style="color:#ccc; line-height:1.6; font-size:0.95em"></div>
-            <div id="m-btns" style="margin-top:15px"></div>
+            <h2 id="m-title" style="margin:0 0 10px 0; color:#fff" x-text="$store.dialog.title"></h2>
+            <div id="m-desc" style="color:#ccc; line-height:1.6; font-size:0.95em">
+                <div :class="$store.dialog.class" x-html="$store.dialog.content"></div>
+            </div>
+            <div id="m-btns" style="margin-top:15px" >
+                <button @click="$store.dialog.buttonAction" x-text="$store.dialog.buttonText">繼續</button>
+            </div>
         </div>
     </div>
 
@@ -95,37 +227,37 @@
             <button type="button" x-bind="startGame(3)" style="width:120px;text-align:center;border-color:var(--r-legend)">🔴 挑戰模式</button>
         </div>
     </div>
-
+    
+    <!-- Jobs Selection -->
     <div id="screen-jobs" class="overlay" x-show="$store.ui.showJobSelection" style="display:none; flex-direction:column; justify-content:flex-start; padding-top:5vh;"> 
-    <!-- 標題區 -->
-    <div style="text-align:center; margin-bottom:15px;">
-        <h2 style="color:#ccc; margin:0 0 10px 0;">Step 1: 選擇前世身份</h2>
-        <p style="color:#888; font-size:0.9em; margin:0;">請選擇一個戰鬥風格以查看詳細職業</p>
-    </div>
+        <div style="text-align:center; margin-bottom:15px;">
+            <h2 style="color:#ccc; margin:0 0 10px 0;">Step 1: 選擇前世身份</h2>
+            <p style="color:#888; font-size:0.9em; margin:0;">請選擇一個戰鬥風格以查看詳細職業</p>
+        </div>
 
-    <!-- 1. 固定不消失的分類按鈕列 -->
-    <div id="tab-container" style="display:flex; gap:10px; margin-bottom:20px; flex-wrap:wrap; justify-content:center;">
-        <!-- 注意：onclick 傳入的參數對應 RPG_CLASSES 的 key -->
-        <button id="tab-warrior" onclick="renderJobs('warrior')" style="border-color:#d96; min-width:80px;">🛡️ 鐵衛</button>
-        <button id="tab-berserker" onclick="renderJobs('berserker')" style="border-color:#f44; min-width:80px;">⚔️ 狂戰</button>
-        <button id="tab-ranger" onclick="renderJobs('ranger')" style="border-color:#4f4; min-width:80px;">🏹 遊俠</button>
-        <button id="tab-mage" onclick="renderJobs('mage')" style="border-color:#4cf; min-width:80px;">🔮 秘法</button>
-        <button id="tab-special" onclick="renderJobs('special')" style="border-color:#ffd700; min-width:80px;">🦄 特殊</button>
-    </div>
+        <!-- 1. 固定不消失的分類按鈕列 -->
+        <div id="tab-container" style="display:flex; gap:10px; margin-bottom:20px; flex-wrap:wrap; justify-content:center;">
+            <!-- 注意：onclick 傳入的參數對應 RPG_CLASSES 的 key -->
+            <button id="tab-warrior" onclick="renderJobs('warrior')" style="border-color:#d96; min-width:80px;">🛡️ 鐵衛</button>
+            <button id="tab-berserker" onclick="renderJobs('berserker')" style="border-color:#f44; min-width:80px;">⚔️ 狂戰</button>
+            <button id="tab-ranger" onclick="renderJobs('ranger')" style="border-color:#4f4; min-width:80px;">🏹 遊俠</button>
+            <button id="tab-mage" onclick="renderJobs('mage')" style="border-color:#4cf; min-width:80px;">🔮 秘法</button>
+            <button id="tab-special" onclick="renderJobs('special')" style="border-color:#ffd700; min-width:80px;">🦄 特殊</button>
+        </div>
 
-    <!-- 2. 角色卡片顯示區 (這裡只會顯示當前選中分類的角色) -->
-    <div id="job-container" class="btn-grid" style="
-        width: 95%; 
-        max-width: 1000px; 
-        max-height: 65vh; 
-        overflow-y: auto; 
-        display: flex; 
-        grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); 
-        gap: 15px; 
-        padding: 5px;
-        align-content: start;
-        justify-content: center;">
-            <div x-show="$store.ui.showJobIntros" style="text-align:center; padding:20px; color:#aaa;">
+        <!-- 2. 角色卡片顯示區 (這裡只會顯示當前選中分類的角色) -->
+        <div id="job-container" class="btn-grid" style="
+            width: 95%; 
+            max-width: 1000px; 
+            max-height: 65vh; 
+            overflow-y: auto; 
+            display: flex; 
+            grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); 
+            gap: 15px; 
+            padding: 5px;
+            align-content: start;
+            justify-content: center;">
+            <div x-show="$store.ui.showJobsIntro" style="text-align:center; padding:20px; color:#aaa;">
                 <h3 style="margin-bottom:20px; color:#fff;">請點擊上方按鈕選擇系別</h3>
                 <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap:15px; text-align:left; width:100%; max-width:600px;">
                     <div style="border-left:3px solid #aaa; padding-left:10px;">
@@ -151,35 +283,35 @@
                 </div>
                 <p style="margin-top:30px; font-size:0.9em; color:#666;">點擊上方按鈕即可查看詳細角色數值</p>
             </div>
-                <template id="job-template" x-show="$store.ui.showJobs" x-for="info in $store.data.jobs">
-                    <div class="comp-box" style="cursor: pointer; text-align: left; border: 1px solid #ff4444; display: flex; flex-direction: column; justify-content: space-between;" :style="{'border-color': info.color}" x-bind="selectJob(info, info.stat)">
-            <div>
-                <div class="q3" style="font-size:1.1em; margin-bottom:8px; color:#f44; text-shadow:none;" x-text="info.name" :style="{color: info.color}">Cosplayer (Lag)</div>
-                <div style="font-size:0.9em; margin-bottom:8px; background:#1a1a1a; padding:4px; border-radius:3px; text-align:center;">
-                    <span style="color:#f66" x-text="'力' + info.stat.str">力4</span> 
-                    <span style="color:#4f4" x-text="'敏' + info.stat.agi">敏6</span> 
-                    <span style="color:#4cf" x-text="'智' + info.stat.int">智8</span> 
-                    <span style="color:#f4f" x-text="'意' + info.stat.wil">意5</span>
+            <template id="job-template" x-show="$store.ui.showJobs" x-for="info in $store.data.jobs">
+                <div class="comp-box" style="cursor: pointer; text-align: left; border: 1px solid #ff4444; display: flex; flex-direction: column; justify-content: space-between;" :style="{'border-color': info.color}" x-bind="selectJob(info, info.stat)">
+                <div>
+                    <div class="q3" style="font-size:1.1em; margin-bottom:8px; color:#f44; text-shadow:none;" x-text="info.name" :style="{color: info.color}">Cosplayer (Lag)</div>
+                    <div style="font-size:0.9em; margin-bottom:8px; background:#1a1a1a; padding:4px; border-radius:3px; text-align:center;">
+                        <span style="color:#f66" x-text="'力' + info.stat.str">力4</span> 
+                        <span style="color:#4f4" x-text="'敏' + info.stat.agi">敏6</span> 
+                        <span style="color:#4cf" x-text="'智' + info.stat.int">智8</span> 
+                        <span style="color:#f4f" x-text="'意' + info.stat.wil">意5</span>
+                    </div>
+                    <div style="font-size:0.85em; color:#ccc; line-height:1.5;" x-text="info.desc">高智商，武器易損壞。</div>
                 </div>
-                <div style="font-size:0.85em; color:#ccc; line-height:1.5;" x-text="info.desc">高智商，武器易損壞。</div>
-            </div>
-            <div style="margin-top:10px; font-size:0.8em; color:#666; text-align:right;" x-text="info.trait">
-                特質: 玻璃大炮
-            </div>
-    </template>
+                <div style="margin-top:10px; font-size:0.8em; color:#666; text-align:right;" x-text="info.trait">特質: 玻璃大炮</div>
+            </template>
+        </div>
     </div>
-</div>
+
+    <!-- MBTI Selection -->
     <div id="screen-mbti" class="overlay" style="display:none" x-show="$store.ui.showMBTI">
         <h2 style="color:#ccc; margin-bottom:20px">Step 2: 選擇人格特質</h2>
         <div id="mbti-container" style="display:flex; gap:20px; flex-wrap:wrap; justify-content:center;">
             <template id="job-template" x-show="$store.ui.showMBTI" x-for="info in $store.data.mbtis">
-            <div class="comp-box" style="width: 250px; cursor: pointer;" @click="finishSetup(info)">
-                <strong class="c-mbti" x-text="info.id + ' ' + info.name">ENTP 辯論家</strong>
-                <br>
-                <span style="font-size:0.8em;color:#aaa" x-text="info.desc">聰明好奇，喜歡挑戰風險。</span>
-                <br>
-                <div style="margin-top:8px;color:#fff;font-size:0.9em" x-text="info.bonusText">敏捷 +2, 智力 +1</div>
-            </div>
+                <div class="comp-box" style="width: 250px; cursor: pointer;" @click="finishSetup(info)">
+                    <strong class="c-mbti" x-text="info.id + ' ' + info.name">ENTP 辯論家</strong>
+                    <br>
+                    <span style="font-size:0.8em;color:#aaa" x-text="info.desc">聰明好奇，喜歡挑戰風險。</span>
+                    <br>
+                    <div style="margin-top:8px;color:#fff;font-size:0.9em" x-text="info.bonusText">敏捷 +2, 智力 +1</div>
+                </div>
             </template>
         </div>
     </div>

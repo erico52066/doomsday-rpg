@@ -1,6 +1,14 @@
 [
-    {"n":"廢棄超市", "d":1, "l":"food", "desc":"尋找食物"}, {"n":"五金店", "d":2, "l":"melee", "desc":"武器零件"}, {"n":"診所", "d":2, "l":"med", "desc":"藥品"},
-    {"n":"民居", "d":1, "l":"random", "desc":"隨機物資"}, {"n":"警局分局", "d":3, "l":"ranged", "desc":"槍械"}, {"n":"服裝店", "d":1, "l":"body", "desc":"衣物"},
-    {"n":"公園", "d":1, "l":"random", "desc":"散步"}, {"n":"銀行", "d":3, "l":"acc", "desc":"貴重品"}, {"n":"下水道", "d":4, "l":"random", "desc":"危險探索"},
-    {"n":"電子城", "d":2, "l":"acc", "desc":"零件"}, {"n":"健身房", "d":2, "l":"melee", "desc":"器械"}, {"n":"學校", "d":2, "l":"random", "desc":"物資"}
+    {"name":"廢棄超市", "risk":1, "loot":"food", "desc":"尋找食物"},
+    {"name":"五金店", "risk":2, "loot":"melee", "desc":"武器零件"},
+    {"name":"診所", "risk":2, "loot":"med", "desc":"藥品"},
+    {"name":"民居", "risk":1, "loot":"random", "desc":"隨機物資"},
+    {"name":"警局分局", "risk":3, "loot":"ranged", "desc":"槍械"},
+    {"name":"服裝店", "risk":1, "loot":"body", "desc":"衣物"},
+    {"name":"公園", "risk":1, "loot":"random", "desc":"散步"}, 
+    {"name":"銀行", "risk":3, "loot":"acc", "desc":"貴重品"}, 
+    {"name":"下水道", "risk":4, "loot":"random", "desc":"危險探索"},
+    {"name":"電子城", "risk":2, "loot":"acc", "desc":"零件"}, 
+    {"name":"健身房", "risk":2, "loot":"melee", "desc":"器械"},
+    {"name":"學校", "risk":2, "loot":"random", "desc":"物資"}
 ]
