@@ -126,6 +126,7 @@ export const MODAL = {
     story: 1,
     loot: 2,
     stats:3,
+    skill: 4,
 }
 
 export const ACTION = {

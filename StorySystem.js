@@ -223,8 +223,10 @@ export function storyChoose(type, statKey, isBoss, bossName, isQuest, strategy) 
         return;
     }
     
-    if(type === 'good') reactiveGameState.moral = Math.min(100, reactiveGameState.moral + 2);
-    if(type === 'bad') reactiveGameState.moral = Math.max(0, reactiveGameState.moral - 2);
+    if(type === 'good') 
+        reactiveGameState.moral = Math.min(100, reactiveGameState.moral + 2);
+    if(type === 'bad') 
+        reactiveGameState.moral = Math.max(0, reactiveGameState.moral - 2);
     let res = calculateOutcome(type, statKey);
     let resultText = "";
     let scoreChange = 0;

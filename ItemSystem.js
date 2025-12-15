@@ -1,6 +1,7 @@
-import {reactiveGameState} from './GameMain.js';
 import * as Constant from './GameData.js';
-import {getStat} from './Character.js';
+import { reactiveGameState, log } from './GameMain.js';
+import { getStat } from './Character.js';
+import { closeModal, updateUI } from './UIManager.js';
 
 // itemp
 // === 物品標籤生成器 ===

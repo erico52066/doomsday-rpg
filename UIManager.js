@@ -1,9 +1,9 @@
 import * as Constant from './GameData.js';
 import { reactiveGameState } from './GameMain.js';
 import { getSanityState, getStat, calcDerivedStats } from './Character.js';
-import { getBagCapacity, getEquipVal, getItemValue, getItemValueLabel, getItemTypeTag, recycleLoot, discardLoot, equipLoot, takeItemToBag} from './ItemSystem.js';
+import { getBagCapacity, getEquipVal, getItemValue, getItemValueLabel, getItemTypeTag, recycleLoot, discardLoot, equipLoot, takeItemToBag, useLootItemDirectly } from './ItemSystem.js';
 import { finishStory, getEventSuccessRate } from './StorySystem.js';
-import { getDmgEst } from './CombatSystem.js';
+import { combatRound, performSkill } from './CombatSystem.js';
 
 // ==================== UI 與 輔助函數 ====================
 // ui
@@ -94,7 +94,6 @@ export function showStats() {
     let atkRanged = getEquipVal(reactiveGameState.eq.ranged) + finalA;
     let totalDef = getEquipVal(reactiveGameState.eq.head) + getEquipVal(reactiveGameState.eq.body);
 
-    // Alpine.store('ui').showModal = Constant.MODAL.stats;
     Alpine.store('stat').finalS = finalS;
     Alpine.store('stat').finalA = finalA;
     Alpine.store('stat').finalI = finalI;
@@ -110,50 +109,11 @@ export function showStats() {
         title: "詳細屬性",
         content: "",
         buttons:[{ 
-            action: ()=>{
-                // {Alpine.store('ui').showStats};
-                closeModal([Alpine.store('ui').showStats]);
-            }, 
+            action: closeModal, 
             text:"關閉" ,
         }],
         layout: Constant.MODAL.stats,
     }
-
-    // let html = `<div style="text-align:left; padding:10px;">
-    //         <h3 style="border-bottom:1px solid #444; padding-bottom:5px; margin-top:0">📊 角色屬性 (Lv.${reactiveGameState.level})</h3>
-            
-    //     <!-- 被動技能顯示區 -->
-    //         <div class="comp-box" style="margin-bottom:15px; border-left:3px solid var(--skill-color); background:#1a1a1a">
-    //             <div style="color:var(--skill-color); font-weight:bold">被動特質: ${reactiveGameState.job.trait}</div>
-    //             <div style="font-size:0.9em; color:#ccc; margin-top:3px">${reactiveGameState.job.desc}</div>
-    //             ${reactiveGameState.job.passive === 'pills' ? '<div style="font-size:0.8em;color:#666">(每回合機率觸發紅/藍藥丸)</div>' : ''}
-    //         </div>
-
-    //         <div class="comp-container">
-    //             <!-- 基礎四維 (新增說明) -->
-    //             <div class="comp-box">
-    //                 <div style="color:#f66">💪 力量: ${finalS} <span style="font-size:0.75em; color:#888; float:right; margin-top:2px">近戰攻擊 / 暴傷</span></div>
-    //                 <div style="color:#4f4">🦵 敏捷: ${finalA} <span style="font-size:0.75em; color:#888; float:right; margin-top:2px">遠程攻擊 / 閃避</span></div>
-    //                 <div style="color:#4cf">🧠 智力: ${finalI} <span style="font-size:0.75em; color:#888; float:right; margin-top:2px">暴擊率 / 探索</span></div>
-    //                 <div style="color:#f4f">🛡️ 意志: ${finalW} <span style="font-size:0.75em; color:#888; float:right; margin-top:2px">物理減傷 / 抗性</span></div>
-    //             </div>
-                
-    //             <!-- 戰鬥數值 -->
-    //             <div class="comp-box">
-    //                 <div>⚔️ 近戰攻擊: <strong>${atkMelee}</strong></div>
-    //                 <div>🔫 遠程攻擊: <strong>${atkRanged}</strong></div>
-    //                 <div>🛡️ 物理防禦: <strong>${totalDef}</strong> <span style="font-size:0.8em;color:#aaa">(-${d.dmgRed}%)</span></div>
-    //                 <hr style="border-color:#333; margin:4px 0">
-    //                 <div>💨 閃避率: <strong>${d.dodge}%</strong></div>
-    //                 <div>💥 暴擊率: <strong>${d.crit}%</strong> <span style="font-size:0.8em;color:#aaa">(傷${d.critDmg}%)</span></div>
-    //             </div>
-    //         </div>
-
-    //         <div style="margin-top:10px; font-size:0.85em; color:#888">
-    //             XP: <span style="color:var(--xp-color)">${reactiveGameState.xp}/20</span> | 道德: ${reactiveGameState.moral} | 幸運: ${getStat('luck')}
-    //         </div>
-    //     </div>`;
-    // openModal("詳細屬性", html, `<button onclick="closeModal()">關閉</button>`);
     openModal(modal);
 }
 
@@ -497,12 +457,12 @@ export function closePlotDialog() {
 // ui
 export function openModal(modal) {
     Alpine.store('ui').showGameScreen = modal.showGameScreen;
+    Alpine.store('ui').showModal = modal.layout;
     Alpine.store('dialog').title = modal.title;
     Alpine.store('dialog').content = modal.content;
     Alpine.store('dialog').class = modal.class? modal.class: "";
     Alpine.store('dialog').style = modal.style? modal.style: "";
     Alpine.store('dialog').buttons = modal.buttons? modal.buttons: [{action: closeModal, text: "關閉"}];
-    Alpine.store('ui').showModal = modal.layout;
 }
 
 // ui
@@ -845,11 +805,11 @@ export function closeBossLoot() {
 export function openSkillMenu() {
     if (!reactiveGameState.combat.skillCDs) reactiveGameState.combat.skillCDs = {};
     
-    let html = `<div style="display:grid; gap:8px; max-height:60vh; overflow-y:auto;">`;
-    
+    // let html = `<div style="display:grid; gap:8px; max-height:60vh; overflow-y:auto;">`;
+    Alpine.store('skill').list = [];
     reactiveGameState.unlockedSkills.forEach(sid => {
         // --- 修改開始：加入保底資料，防止技能消失 ---
-        let s = SKILL_DB[sid];
+        let s = Constant.SKILL_DB[sid];
         if (!s) {
             // 如果資料庫找不到這招，手動生成一個「未知技能」物件，而不是 return 跳過
             s = { 
@@ -859,59 +819,68 @@ export function openSkillMenu() {
                 cd: 0 
             };
         }
-        // --- 修改結束 ---
-        
+        // --- 修改結束 ---        
+        let skill = s;
         let cd = reactiveGameState.combat.skillCDs[sid] || 0;
-        let costText = [];
         let canAfford = true;
+        skill.action=()=>{performSkill(sid)};
+        skill.costList =[];
+        skill.disabled = false;
+        skill.class = 'skill-enable';
+        skill.status = {};
+        skill.cd = cd;
         
+        
+
         // 計算消耗顯示
         if (s.cost) {
             if (s.cost.hp) { 
-                costText.push(`<span style="color:#f44">HP-${s.cost.hp}</span>`);
+                skill.costList.push({text: `HP-${s.cost.hp}`, color: '#f44'});
                 if (reactiveGameState.hp <= s.cost.hp) canAfford = false;
             }
             if (s.cost.san) {
-                costText.push(`<span style="color:#88f">SAN-${s.cost.san}</span>`);
+                skill.costList.push({text: `SAN-${s.cost.san}`, color: '#88f'});
                 if (reactiveGameState.san < s.cost.san) canAfford = false;
             }
             if (s.cost.food) {
-                costText.push(`<span style="color:#fa0">飽-${s.cost.food}</span>`);
+                skill.costList.push({text: `飽-${s.cost.food}`, color: '#fa0'});
                 if (reactiveGameState.food < s.cost.food) canAfford = false;
             }
             if (s.cost.money) {
-                costText.push(`<span style="color:#ffd700">$${s.cost.money}</span>`);
+                skill.costList.push({text: `$${s.cost.money}`, color: '#ffd700'});
                 if (reactiveGameState.money < s.cost.money) canAfford = false;
             }
         }
-        
-        let btnStyle = `background:#222; border:1px solid #444; padding:10px; display:flex; justify-content:space-between; align-items:center; text-align:left;`;
-        let statusHtml = '';
-        let disabled = '';
-        
-        if (cd > 0) {
-            statusHtml = `<span style="color:#f44; font-weight:bold;">CD: ${cd}</span>`;
-            btnStyle = `background:#111; border:1px solid #333; opacity:0.6;`;
-            disabled = 'disabled';
-        } else if (!canAfford) {
-            statusHtml = `<span style="color:#888;">消耗不足</span>`;
-            btnStyle = `background:#111; border:1px solid #333; opacity:0.6;`;
-            disabled = 'disabled';
-        } else {
-            statusHtml = `<span style="color:#4f4; font-weight:bold;">就緒</span>`;
-            btnStyle += ` cursor:pointer; border-color:#fa0;`;
+
+        if(skill.costList.length == 0){
+            skill.costList.push({text: '無', color: '#f44'});
         }
         
-        html += `<button onclick="performSkill('${sid}')" ${disabled} style="${btnStyle} width:100%;">
-            <div>
-                <div style="font-weight:bold; font-size:1.1em; color:#fff;">${s.n}</div>
-                <div style="font-size:0.8em; color:#ccc; margin-top:2px;">${s.desc}</div>
-                <div style="font-size:0.75em; margin-top:4px;">消耗: ${costText.join(' ') || '無'}</div>
-            </div>
-            <div>${statusHtml}</div>
-        </button>`;
+        if (cd > 0) {
+            skill.status.text = `CD: ${cd}`;
+            skill.status.color = '#f44';
+            skill.class = 'skill-disable';
+            skill.disabled = true;
+        } else if (!canAfford) {
+            skill.status.text = `消耗不足`;
+            skill.status.color = '#888';
+            skill.class = 'skill-disable';
+            skill.disabled = true;
+        } else {
+            skill.status.text = `就緒`;
+            skill.status.color = '#4f4';
+        }
+
+        Alpine.store('skill').list.push(skill);
     });
     
-    html += `</div>`;
-    openModal("⚡ 選擇技能", html, `<button onclick="closeModal()">取消</button>`);
+    // html += `</div>`;
+    let modal ={
+        showGameScreen: true,
+        layout: Constant.MODAL.skill,
+        title: "⚡ 選擇技能",
+        buttons: [{action: closeModal, text: "取消"}],
+    }
+
+    openModal(modal);
 }

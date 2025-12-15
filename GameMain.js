@@ -55,6 +55,7 @@ document.addEventListener('alpine:init', () => {
     Alpine.store('enemy', {})
     Alpine.store('player', {})
     Alpine.store('stat', {})
+    Alpine.store('skill', {})
     Alpine.store('loot', {
         showModal: false,
         isEquip: false,

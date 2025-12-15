@@ -1817,7 +1817,7 @@ export function getDynamicEnemyStats(type) {
 // combat
 // 萬能技能解析器 (修復版 v2：括號結構嚴格檢查)
 export function performSkill(sid) {
-    let s = SKILL_DB[sid];
+    let s = Constant.SKILL_DB[sid];
     let c = reactiveGameState.combat;
     let logMsg = [];
     

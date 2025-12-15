@@ -776,6 +776,25 @@ button:disabled {
 	background: #2a2a2a;
 }
 
+.skill-enable {
+	background:#222; 
+	border:1px solid #444; 
+	padding:10px; 
+	display:flex; 
+	justify-content:space-between; 
+	align-items:center; 
+	text-align:left; 
+	cursor:pointer; 
+	border-color:#fa0; 
+	width:100%;
+}
+
+.skil-disable{
+	background:#111; 
+	border:1px solid #333; 
+	opacity:0.6;
+}
+
 @keyframes fadeIn {
 	from {
 		opacity: 0;

@@ -306,15 +306,20 @@ export function doScavenge(loot, risk) {
             
             let modal = {
                 showGameScreen: true,
+                layout: Constant.MODAL.story,
                 title: "獲得物資",
                 content: `在高危區域發現了大量${loot==='food'?'食物':'飲水'}。
                             <br>危險加成: +${Math.floor(risk*30)}%
                             <br><strong style="color:#4f4">${loot==='food'?'食物':'水'} +${finalAmt}</strong>`,
-                buttonAction: ()=>{
-                    closeModal();
-                    campPhase();
-                },
-                buttonText: "收下 (Day +1)",
+                buttons: [
+                    { 
+                        action: ()=>{
+                            closeModal();
+                            campPhase();
+                        },
+                        text: "收下 (Day +1)",
+                    }
+                ],
             }
 
             openModal(modal);
