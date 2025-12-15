@@ -19,6 +19,7 @@ export function getItemTypeTag(type) {
     };
     
     let info = map[type] || { t: '📦 物品', c: '' };
+    return map[type];
     return `<span class="type-tag ${info.c}">${info.t}</span>`;
 }
 
@@ -538,10 +539,6 @@ export function getItemValueLabel(type) {
     if(type === 'shoes') return "🦵 敏捷/閃避";
     return "✨ 數值";
 }
-
-
-
-
 
 // item
 export function useLootItemDirectly() {

@@ -121,3 +121,15 @@ export const LOC_REWARDS = {
     "診所": "med", "公園": "water",
     "銀行": "acc", "電子城": "acc", "學校": "acc"
 };
+
+export const MODAL = {
+    story: 1,
+    loot: 2,
+    stats:3,
+}
+
+export const ACTION = {
+    camp: 0,
+    explore: 1,
+    combat: 2,
+}

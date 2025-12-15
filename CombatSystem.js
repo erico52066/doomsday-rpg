@@ -1,8 +1,10 @@
 import * as Constant from './GameData.js';
-import { reactiveGameState, log } from './GameMain.js';
-import { getCurrentTier, getEquipVal } from './ItemSystem.js';
-import { renderCombat } from './UIManager.js';
-import { getStat, calcDerivedStats } from './Character.js';
+import { reactiveGameState, log, gameOver } from './GameMain.js';
+import { getCurrentTier, getEquipVal, generateBossLoot, createItem } from './ItemSystem.js';
+import { renderCombat, triggerShake, showBossLootWindow, updateUI, showLootModal } from './UIManager.js';
+import { getStat, calcDerivedStats, getSanityState, gainXp } from './Character.js';
+import { completeQuest } from './StorySystem.js';
+import { continueExploration } from './CampSystem.js';
 
 
 // combat
@@ -298,8 +300,6 @@ export function triggerCombat(enemyTemplate, danger) {
     renderCombat();
 }
 
-
-
 // combat
 // 2. 戰鬥描述生成器 (Flavor Text)
 export function getCombatFlavor(attacker, target, dmg, isCrit, isKill) {
@@ -408,7 +408,6 @@ export function combatRound(act) {
         }
     }
     // =================================================
-
     // ★★★ 新增：SAN值過低導致的幻覺檢查 ★★★
     let sanState = getSanityState();
     if (sanState.state === 'madness' && act !== 'flee' && act !== 'defend') {
@@ -424,13 +423,12 @@ export function combatRound(act) {
         }
     }
     // ==========================================
-
     if (act !== 'skill' && reactiveGameState.activeSkillCD > 0) reactiveGameState.activeSkillCD--;
     if (act !== 'defend' && reactiveGameState.playerDefCD > 0) reactiveGameState.playerDefCD--;
     if (c.playerDebuffs.silence > 0) c.playerDebuffs.silence--;
 
     // === 2. 判斷先手權 (Initiative) ===
-    let playerSpd = getStat('a');
+    let playerSpd = getStat('agi');
     let enemySpd = (c.dodge || 0) + (c.isBoss ? 10 : 0); // Boss 速度較快
     
     // 如果玩家防禦，優先級最高；否則比敏捷
@@ -443,548 +441,547 @@ export function combatRound(act) {
     }
 
     // === 定義玩家行動函數 (為了可以調換順序) ===
- const doPlayerMove = () => {
-         // ★★★ 1. 新增：處理「跳過回合」按鈕 (必須放在暈眩檢查之前) ★★★
-        if (act === 'skip') {
-             if (c.playerDebuffs.stun > 0) c.playerDebuffs.stun--;
-             logMsg.push(`<span style="color:#aaa">你無法行動，跳過回合...</span>`);
-             return false; // 返回 false 代表行動完成，讓程式繼續往下跑(去執行敵人回合)
-        }
-        
-        // ★★★ 2. 修改：暈眩攔截 ★★★
-        if (c.playerDebuffs.stun > 0) {
-             // 如果玩家試圖點擊其他按鈕(如攻擊)，但被暈眩，阻止操作
-             logMsg.push(`<span style="color:#fa0">你被擊暈了！請點擊跳過。</span>`);
-             return true; // 返回 true 代表行動失敗，阻止後續流程
-        }
-
-    // === 2. 被動效果 ===
-    if (reactiveGameState.job.passive === 'pills' && Math.random() < 0.33) {
-        if (Math.random() < 0.5) { reactiveGameState.hp = Math.max(1, reactiveGameState.hp - Math.floor(reactiveGameState.maxHp * 0.1)); logMsg.push("<span style='color:#f44'>Red Pill: 扣血</span>"); }
-        else { reactiveGameState.hp += Math.floor((reactiveGameState.maxHp - reactiveGameState.hp) * 0.5); logMsg.push("<span style='color:#4f4'>Blue Pill: 回血</span>"); }
-    }
-    if(reactiveGameState.job.passive === 'dance_style') {
-        let styles = ['Slim','Greenteck','Hoan','Hozin','Pete'];
-        c.buffs.dance = styles[Math.floor(Math.random()*5)];
-        logMsg.push(`切換舞風: ${c.buffs.dance}`);
-    }
-    // 被動：道士
-    if(reactiveGameState.job.passive === 'taoist_buff') {
-        if(Math.random()<0.5) {
-            let h = Math.floor((reactiveGameState.maxHp - reactiveGameState.hp)*0.05); reactiveGameState.hp+=h; logMsg.push("南部毛家: 回血");
-        } else {
-            c.buffs.taoistAtk = (c.buffs.taoistAtk || 0) + 0.02; logMsg.push("北部馬家: 攻+2%");
-        }
-    }
-    // 被動：米芝蓮回血
-    if(reactiveGameState.job.passive === 'chef_regen') {
-        let pct = 0.005 + Math.random()*0.045;
-        let h = Math.floor(reactiveGameState.maxHp * pct); reactiveGameState.hp = Math.min(reactiveGameState.maxHp, reactiveGameState.hp+h);
-    }
-    if(reactiveGameState.job.passive === 'nurse_buff') {
-        let h = Math.floor(reactiveGameState.maxHp * 0.02); reactiveGameState.hp = Math.min(reactiveGameState.maxHp, reactiveGameState.hp+h);
-    }
-    if(reactiveGameState.job.passive === 'random_buff') {
-        let stat = ['s','a','i','w','luck'][Math.floor(Math.random()*5)];
-        reactiveGameState.stats[stat] = Math.floor((reactiveGameState.stats[stat]||0) * 1.1);
-        logMsg.push(`諾貝爾獎: ${Constant.STAT_MAP[stat]}提升`);
-    }
-
-    let derived = calcDerivedStats(); // 重新獲取 (包含 SAN 加成)
-    // === 3. 玩家行動結算 ===
-    let dmg = 0;
-
-    if (act === 'melee' || act === 'ranged') {
-        if (act === 'ranged') reactiveGameState.ammo--;
-
-        // 機械師召喚
-        let engSummon = '';
-        if(reactiveGameState.job.passive === 'eng_summon' && Math.random() < 0.1) {
-            let r = Math.random();
-            if(r < 0.33) engSummon = 'dog';
-            else if(r < 0.66) engSummon = 'doraemon';
-            else engSummon = 'terminator';
-        }
-        // 玻璃大炮
-        if(reactiveGameState.job.passive === 'weapon_break' && Math.random() < 0.015) {
-            logMsg.push("糟糕！武器承受不住你的中二之力而損壞了！"); 
-        }
-        
-        // --- ★★★ Lil Kid 連擊邏輯 ★★★ ---
-        let baseDmg = getDmgEst(act);
-
-       // ★★★ 新增：瘋狂狀態攻擊力加成 ★★★
-        if (derived.sanAtkBonus > 0) {
-            let bonus = Math.floor(baseDmg * derived.sanAtkBonus);
-            baseDmg += bonus;
-            // 這裡不 push log，以免訊息太多，數值會直接反映在傷害上
-        }
-        // ==============================
-
-        let hits = 1; 
-        
-        if (c.buffs.kidClones > 0) {
-            for(let k=0; k<4; k++) {
-                if(Math.random() < 0.3) hits++;
-            }
-            c.buffs.kidClones--; 
-        }
-        
-        dmg = baseDmg * hits;
-        // ---------------------------------
-
-        // 量子計算晶片 (auto_aim)：必定命中且暴擊
-    let autoAim = (reactiveGameState.eq.acc && reactiveGameState.eq.acc.fx && reactiveGameState.eq.acc.fx.t === 'auto_aim');
-        // 暴擊判定
-        derived = calcDerivedStats();
-        let isCrit = false;
-         // 修改暴擊判定
-    if (autoAim || (Math.random() * 100 < derived.crit) || (c.buffs.sleep > 0)) {
-            dmg = Math.floor(dmg * (derived.critDmg / 100));
-            isCrit = true;
-            logMsg.push("🔥 暴擊！");
-        }
-        reactiveGameState.lastCrit = isCrit;
-
-        // 技能/被動加成
-        if (c.buffs.hedgeTurns > 0) { dmg += c.buffs.hedgeAtk; logMsg.push(`(對沖基金 +${c.buffs.hedgeAtk})`); c.buffs.hedgeTurns--; }
-        if (c.buffs.chuunibyou > 0) { dmg += c.buffs.chuuniVal; c.buffs.chuunibyou--; logMsg.push("中二修正拳！"); }
-        if (c.buffs.redbull > 0) { dmg = Math.floor(dmg * 1.3); c.buffs.redbull--; logMsg.push("Red Bull翼擊！"); }
-        if (c.buffs.drift) { dmg = Math.floor(dmg * 1.2); c.buffs.drift--; }
-        
-        // 舞者加成
-        if(c.buffs.dance === 'Greenteck') dmg = Math.floor(dmg * 1.2);
-        if(c.buffs.dance === 'Pete') dmg = Math.floor(dmg * 1.1);
-        if(c.buffs.dance === 'Hoan') dmg = Math.floor(dmg * 1.5);
-        
-        if (reactiveGameState.job.passive === 'truck_hit' && Math.random() < 0.05) { dmg = Math.floor(dmg * 1.5); logMsg.push("CyberTruck撞擊！"); }
-        if (reactiveGameState.job.passive === 'dev_buff' && Math.random() < 0.15) { dmg += (getStat('s')*0.5); logMsg.push("工人助陣！"); }
-        
-        // 連擊 (Wing Chun)
-        let multiHit = (reactiveGameState.job.passive === 'wing_chun' && Math.random() < 0.1) ? 2 : 1;
-        dmg *= multiHit; 
-        if(multiHit>1) logMsg.push(`${multiHit}連擊！`);
-        
-        // 華爾街吸血
-        if(reactiveGameState.job.passive === 'olive_eat') {
-            if(Math.random() < 0.5) { 
-                let heal = Math.floor((reactiveGameState.maxHp - reactiveGameState.hp) * 0.1); 
-                reactiveGameState.hp += heal; 
-                logMsg.push(`量化寬鬆!恢復 +${heal}血`); 
-            } else { 
-                let suck = Math.floor(dmg * 0.3); 
-                reactiveGameState.hp = Math.min(reactiveGameState.maxHp, reactiveGameState.hp + suck); 
-                logMsg.push(`高額手續費! 抽取+${suck}血`); 
-            }
-        }
-        
-        // 機械師效果
-        if(engSummon === 'dog') { c.buffs.bleed = 99; logMsg.push("機械狗咬傷流血！"); } 
-        else if(engSummon === 'doraemon') {
-            let tool = Math.random();
-            if(tool<0.33) { c.buffs.shrink = 1; logMsg.push("縮小電筒！"); }
-            else if(tool<0.66) { c.buffs.doraemon = 'copter'; logMsg.push("竹蜻蜓！"); }
-            else { reactiveGameState.hp = Math.min(reactiveGameState.maxHp, reactiveGameState.hp + Math.floor(reactiveGameState.maxHp*0.2)); logMsg.push("吃豆沙包！"); }
-        }
-
-        // 命中判定
-        let enemyDodge = c.dodge || 0;
-        if (c.buffs.dodgeUp) enemyDodge += 30;
-        if (c.buffs.sleep || c.isStunned || c.buffs.root) enemyDodge = 0;
-
-        let myAcc = getStat('a') * 0.5;
-        // ★★★ 新增：冷靜狀態命中加成 / 瘋狂狀態命中懲罰 ★★★
-        if (derived.sanAccBonus) {
-            myAcc += derived.sanAccBonus;
-        }
-        // ==============================
-        let finalDodge = Math.max(0, enemyDodge - myAcc);
-        let ignoreDodge = autoAim || (c.buffs.ignoreDef > 0) || (c.buffs.matrix > 0);
-
-        if (!ignoreDodge && Math.random() * 100 < finalDodge) {
-            dmg = 0;
-            logMsg.push(`<span style="color:#aaa">攻擊被閃避 (${Math.floor(finalDodge)}%)</span>`);
-        } else {
-            // 命中成功
-            if (hits > 1) {
-                logMsg.push(`<strong style="color:#4f4">🥷 忍刀連斬 (x${hits} 連擊)！</strong>`);
+    const doPlayerMove = () => {
+            // ★★★ 1. 新增：處理「跳過回合」按鈕 (必須放在暈眩檢查之前) ★★★
+            if (act === 'skip') {
+                if (c.playerDebuffs.stun > 0) c.playerDebuffs.stun--;
+                logMsg.push(`<span style="color:#aaa">你無法行動，跳過回合...</span>`);
+                return false; // 返回 false 代表行動完成，讓程式繼續往下跑(去執行敵人回合)
             }
             
-            // 觸發命中特效
-            if (reactiveGameState.job.passive === 'flash_blind' && Math.random() < 0.1) { c.buffs.blind = 1; logMsg.push("致盲！"); }
-            if (reactiveGameState.job.passive === 'sleep_hit' && Math.random() < 0.1) { c.buffs.sleep = 1; logMsg.push("催眠！"); }
-            if (reactiveGameState.job.passive === 'bleed_hit' && Math.random() < 0.2) { c.buffs.bleed = 2; logMsg.push("流血！"); }
-            if(reactiveGameState.job.passive === 'counter_block' && Math.random() < 0.15) { c.buffs.tempBlock = 0.8; logMsg.push("格擋反擊架勢！"); }
-            if(reactiveGameState.job.passive === 'burn_proc' && Math.random() < 0.2) { c.buffs.burn = 2; logMsg.push("燃燒！"); }
+            // ★★★ 2. 修改：暈眩攔截 ★★★
+            if (c.playerDebuffs.stun > 0) {
+                // 如果玩家試圖點擊其他按鈕(如攻擊)，但被暈眩，阻止操作
+                logMsg.push(`<span style="color:#fa0">你被擊暈了！請點擊跳過。</span>`);
+                return true; // 返回 true 代表行動失敗，阻止後續流程
+            }
+
+        // === 2. 被動效果 ===
+        if (reactiveGameState.job.passive === 'pills' && Math.random() < 0.33) {
+            if (Math.random() < 0.5) { reactiveGameState.hp = Math.max(1, reactiveGameState.hp - Math.floor(reactiveGameState.maxHp * 0.1)); logMsg.push("<span style='color:#f44'>Red Pill: 扣血</span>"); }
+            else { reactiveGameState.hp += Math.floor((reactiveGameState.maxHp - reactiveGameState.hp) * 0.5); logMsg.push("<span style='color:#4f4'>Blue Pill: 回血</span>"); }
+        }
+        if(reactiveGameState.job.passive === 'dance_style') {
+            let styles = ['Slim','Greenteck','Hoan','Hozin','Pete'];
+            c.buffs.dance = styles[Math.floor(Math.random()*5)];
+            logMsg.push(`切換舞風: ${c.buffs.dance}`);
+        }
+        // 被動：道士
+        if(reactiveGameState.job.passive === 'taoist_buff') {
+            if(Math.random()<0.5) {
+                let h = Math.floor((reactiveGameState.maxHp - reactiveGameState.hp)*0.05); reactiveGameState.hp+=h; logMsg.push("南部毛家: 回血");
+            } else {
+                c.buffs.taoistAtk = (c.buffs.taoistAtk || 0) + 0.02; logMsg.push("北部馬家: 攻+2%");
+            }
+        }
+        // 被動：米芝蓮回血
+        if(reactiveGameState.job.passive === 'chef_regen') {
+            let pct = 0.005 + Math.random()*0.045;
+            let h = Math.floor(reactiveGameState.maxHp * pct); reactiveGameState.hp = Math.min(reactiveGameState.maxHp, reactiveGameState.hp+h);
+        }
+        if(reactiveGameState.job.passive === 'nurse_buff') {
+            let h = Math.floor(reactiveGameState.maxHp * 0.02); reactiveGameState.hp = Math.min(reactiveGameState.maxHp, reactiveGameState.hp+h);
+        }
+        if(reactiveGameState.job.passive === 'random_buff') {
+            let stat = ['s','a','i','w','luck'][Math.floor(Math.random()*5)];
+            reactiveGameState.stats[stat] = Math.floor((reactiveGameState.stats[stat]||0) * 1.1);
+            logMsg.push(`諾貝爾獎: ${Constant.STAT_MAP[stat]}提升`);
         }
 
-    } else if (act === 'skill') {
-        reactiveGameState.activeSkillCD = SKILLS[reactiveGameState.job.sk].cd;
-        let sk = reactiveGameState.job.sk;
-        let s = getStat('s'), i = getStat('i'), w = getStat('w'), luck = getStat('luck');
-        let dScale = 1 + (reactiveGameState.diff - 1) * 0.25;
-        let sScale = 1 + (reactiveGameState.diff - 1) * 0.4;
-        let baseAvg = (getDmgEst('melee') + getDmgEst('ranged')) / 2;
-        let derived = calcDerivedStats();
+        let derived = calcDerivedStats(); // 重新獲取 (包含 SAN 加成)
+        // === 3. 玩家行動結算 ===
+        let dmg = 0;
 
-// 輔助函數：計算屬性變化
-        const getStatDiff = (statName) => {
-            let oldVal = getStat(statName);
-            // 這裡我們無法簡單回滾狀態再計算，所以採用顯示"當前值與Buff說明"的方式
-            // 或者直接根據Buff邏輯計算預期增幅
-            return oldVal; 
-        };
+        if (act === 'melee' || act === 'ranged') {
+            if (act === 'ranged') reactiveGameState.ammo--;
 
-        // --- 完整技能列表 ---
-        if (sk === 'kid_squad') {
-            c.buffs.kidClones = 5; 
-            logMsg.push("🥷 忍法：影分身之術！(接下來 5 回合攻擊機率連擊)");
-            dmg = 0;
-        } 
-        else if(sk === 'chuunibyou') {
-            c.buffs.chuunibyou = 3; 
-            c.buffs.chuuniVal = Math.floor(baseAvg * Math.random() * dScale); 
-            dmg = (baseAvg * dScale) + c.buffs.chuuniVal;
-            logMsg.push(`中二病發作！攻擊力波動上升！`);
-        } 
-        else if (sk === 'snipe') {
-            dmg = baseAvg * 2 * dScale;
-            if(Math.random()*100 < derived.crit) dmg *= (derived.critDmg/100);
-            logMsg.push("🎯 狙擊鎖定！");
-        } 
-        else if(sk === 'first_aid') {
-            let pct = 0.5 * sScale; 
-            let h = Math.floor((reactiveGameState.maxHp - reactiveGameState.hp) * pct); 
-            reactiveGameState.hp += h;
-            logMsg.push(`急救處理：恢復了 ${h} 點生命`);
-        } 
-        else if(sk === 'fate_throw') {
-            let mult = 0.5 + Math.random() * 3.5; 
-            dmg = baseAvg * mult * dScale; 
-            if(Math.random()*100 < derived.crit) dmg *= (derived.critDmg/100);
-            logMsg.push("命運一擲！");
-        } 
-        else if(sk === 'weakness_scan') {
-            c.buffs.defDown = 3;
-            logMsg.push("弱點分析：敵人防禦力大幅下降 (3回合)");
-        } 
-        else if(sk === 'risk_manage') {
-            c.playerShield = Math.floor(reactiveGameState.maxHp * sScale);
-            logMsg.push(`風險管理：獲得鉅額護盾 (${c.playerShield})`);
-        } 
-        else if (sk === 'kungfu_panda') {
-             let r = Math.random();
-             if(r < 0.01 && !c.isBoss) { dmg = c.hp; logMsg.push("【無錫碎骨指】直接秒殺！"); }
-             else if(r < 0.5) { 
-                 let h = Math.floor((reactiveGameState.maxHp-reactiveGameState.hp)*0.5 * sScale); 
-                 reactiveGameState.hp += h; logMsg.push(`【吞併Diliveroo】恢復了 ${h} 點生命`); 
-             }
-             else { 
-                 c.isStunned = true; c.buffs.stun = 2; 
-                 dmg = baseAvg * 1.5 * dScale; 
-                 logMsg.push("【衝擊Keeta】造成傷害並暈眩敵人！"); 
-             }
-        }
-        else if(sk === 'flash_bang') {
-            c.buffs.blind = 3; c.buffs.atkDown = 3;
-            logMsg.push("投擲閃光彈！敵人降攻致盲");
-        } 
-        else if(sk === 'rage') {
-            let hpCost = Math.floor(reactiveGameState.hp * 0.2);
-            reactiveGameState.hp = Math.max(1, reactiveGameState.hp - hpCost);
-            dmg = s * 8 * dScale; 
-            let strBonus = s * (reactiveGameState.diff === 3 ? 12 : 6); 
-            let shieldGain = Math.floor((hpCost * (reactiveGameState.diff === 3 ? 3 : 2)) + strBonus);
-            c.playerShield = shieldGain;
-            c.buffs.rageShieldTimer = 2;
-            logMsg.push(`狂暴：犧牲血量，爆發 <strong style="color:#4f4">${shieldGain} 肌肉護盾</strong> (2回合)！`);
-        } 
-        else if(sk === 'god_hand') {
-            c.buffs.godBlock = 1; 
-            logMsg.push("神之一手：絕對防禦架勢！(下回合必反擊)");
-        } 
-        else if(sk === 'tree_strike') {
-            dmg = baseAvg * 1.5 * dScale; 
-            c.buffs.root = 2; c.isStunned = true;
-            logMsg.push("鏟泥種樹：敵人被樹根纏繞定身！");
-        } 
-        else if(sk === 'risk_hedge') {
-            c.buffs.hedge = 1; 
-            c.buffs.hedgeAtk = Math.floor(c.atk * dScale); 
-            c.buffs.hedgeTurns = 2;
-            logMsg.push(`風險對沖: 免疫傷害，轉化敵攻為加成`);
-        } 
-        else if(sk === 'dictionary') {
-            let r = Math.random();
-            if(r < 0.25) { dmg = baseAvg * 5 * dScale; logMsg.push("【習相遠】：習帝之擊！"); } 
-            else if(r < 0.5) { 
-                c.playerShield = Math.floor(w * 5 * sScale); 
-                logMsg.push(`【性相近】：獲得聖賢護盾 (${c.playerShield})`); 
+            // 機械師召喚
+            let engSummon = '';
+            if(reactiveGameState.job.passive === 'eng_summon' && Math.random() < 0.1) {
+                let r = Math.random();
+                if(r < 0.33) engSummon = 'dog';
+                else if(r < 0.66) engSummon = 'doraemon';
+                else engSummon = 'terminator';
+            }
+            // 玻璃大炮
+            if(reactiveGameState.job.passive === 'weapon_break' && Math.random() < 0.015) {
+                logMsg.push("糟糕！武器承受不住你的中二之力而損壞了！"); 
+            }
+            
+            // --- ★★★ Lil Kid 連擊邏輯 ★★★ ---
+            let baseDmg = getDmgEst(act);
+
+        // ★★★ 新增：瘋狂狀態攻擊力加成 ★★★
+            if (derived.sanAtkBonus > 0) {
+                let bonus = Math.floor(baseDmg * derived.sanAtkBonus);
+                baseDmg += bonus;
+                // 這裡不 push log，以免訊息太多，數值會直接反映在傷害上
+            }
+            // ==============================
+
+            let hits = 1; 
+            
+            if (c.buffs.kidClones > 0) {
+                for(let k=0; k<4; k++) {
+                    if(Math.random() < 0.3) hits++;
+                }
+                c.buffs.kidClones--; 
+            }
+            
+            dmg = baseDmg * hits;
+            // ---------------------------------
+
+            // 量子計算晶片 (auto_aim)：必定命中且暴擊
+            let autoAim = (reactiveGameState.eq.acc && reactiveGameState.eq.acc.fx && reactiveGameState.eq.acc.fx.t === 'auto_aim');
+            // 暴擊判定
+            derived = calcDerivedStats();
+            let isCrit = false;
+            // 修改暴擊判定
+            if (autoAim || (Math.random() * 100 < derived.crit) || (c.buffs.sleep > 0)) {
+                dmg = Math.floor(dmg * (derived.critDmg / 100));
+                isCrit = true;
+                logMsg.push("🔥 暴擊！");
+            }
+            reactiveGameState.lastCrit = isCrit;
+
+            // 技能/被動加成
+            if (c.buffs.hedgeTurns > 0) { dmg += c.buffs.hedgeAtk; logMsg.push(`(對沖基金 +${c.buffs.hedgeAtk})`); c.buffs.hedgeTurns--; }
+            if (c.buffs.chuunibyou > 0) { dmg += c.buffs.chuuniVal; c.buffs.chuunibyou--; logMsg.push("中二修正拳！"); }
+            if (c.buffs.redbull > 0) { dmg = Math.floor(dmg * 1.3); c.buffs.redbull--; logMsg.push("Red Bull翼擊！"); }
+            if (c.buffs.drift) { dmg = Math.floor(dmg * 1.2); c.buffs.drift--; }
+            
+            // 舞者加成
+            if(c.buffs.dance === 'Greenteck') dmg = Math.floor(dmg * 1.2);
+            if(c.buffs.dance === 'Pete') dmg = Math.floor(dmg * 1.1);
+            if(c.buffs.dance === 'Hoan') dmg = Math.floor(dmg * 1.5);
+            
+            if (reactiveGameState.job.passive === 'truck_hit' && Math.random() < 0.05) { dmg = Math.floor(dmg * 1.5); logMsg.push("CyberTruck撞擊！"); }
+            if (reactiveGameState.job.passive === 'dev_buff' && Math.random() < 0.15) { dmg += (getStat('s')*0.5); logMsg.push("工人助陣！"); }
+            
+            // 連擊 (Wing Chun)
+            let multiHit = (reactiveGameState.job.passive === 'wing_chun' && Math.random() < 0.1) ? 2 : 1;
+            dmg *= multiHit; 
+            if(multiHit>1) logMsg.push(`${multiHit}連擊！`);
+            
+            // 華爾街吸血
+            if(reactiveGameState.job.passive === 'olive_eat') {
+                if(Math.random() < 0.5) { 
+                    let heal = Math.floor((reactiveGameState.maxHp - reactiveGameState.hp) * 0.1); 
+                    reactiveGameState.hp += heal; 
+                    logMsg.push(`量化寬鬆!恢復 +${heal}血`); 
+                } else { 
+                    let suck = Math.floor(dmg * 0.3); 
+                    reactiveGameState.hp = Math.min(reactiveGameState.maxHp, reactiveGameState.hp + suck); 
+                    logMsg.push(`高額手續費! 抽取+${suck}血`); 
+                }
+            }
+            
+            // 機械師效果
+            if(engSummon === 'dog') { c.buffs.bleed = 99; logMsg.push("機械狗咬傷流血！"); } 
+            else if(engSummon === 'doraemon') {
+                let tool = Math.random();
+                if(tool<0.33) { c.buffs.shrink = 1; logMsg.push("縮小電筒！"); }
+                else if(tool<0.66) { c.buffs.doraemon = 'copter'; logMsg.push("竹蜻蜓！"); }
+                else { reactiveGameState.hp = Math.min(reactiveGameState.maxHp, reactiveGameState.hp + Math.floor(reactiveGameState.maxHp*0.2)); logMsg.push("吃豆沙包！"); }
+            }
+
+            // 命中判定
+            let enemyDodge = c.dodge || 0;
+            if (c.buffs.dodgeUp) enemyDodge += 30;
+            if (c.buffs.sleep || c.isStunned || c.buffs.root) enemyDodge = 0;
+
+            let myAcc = getStat('agi') * 0.5;
+            // ★★★ 新增：冷靜狀態命中加成 / 瘋狂狀態命中懲罰 ★★★
+            if (derived.sanAccBonus) {
+                myAcc += derived.sanAccBonus;
+            }
+            // ==============================
+            let finalDodge = Math.max(0, enemyDodge - myAcc);
+            let ignoreDodge = autoAim || (c.buffs.ignoreDef > 0) || (c.buffs.matrix > 0);
+
+            if (!ignoreDodge && Math.random() * 100 < finalDodge) {
+                dmg = 0;
+                logMsg.push(`<span style="color:#aaa">攻擊被閃避 (${Math.floor(finalDodge)}%)</span>`);
+            } else {
+                // 命中成功
+                if (hits > 1) {
+                    logMsg.push(`<strong style="color:#4f4">🥷 忍刀連斬 (x${hits} 連擊)！</strong>`);
+                }
+                
+                // 觸發命中特效
+                if (reactiveGameState.job.passive === 'flash_blind' && Math.random() < 0.1) { c.buffs.blind = 1; logMsg.push("致盲！"); }
+                if (reactiveGameState.job.passive === 'sleep_hit' && Math.random() < 0.1) { c.buffs.sleep = 1; logMsg.push("催眠！"); }
+                if (reactiveGameState.job.passive === 'bleed_hit' && Math.random() < 0.2) { c.buffs.bleed = 2; logMsg.push("流血！"); }
+                if(reactiveGameState.job.passive === 'counter_block' && Math.random() < 0.15) { c.buffs.tempBlock = 0.8; logMsg.push("格擋反擊架勢！"); }
+                if(reactiveGameState.job.passive === 'burn_proc' && Math.random() < 0.2) { c.buffs.burn = 2; logMsg.push("燃燒！"); }
+            }
+
+        } else if (act === 'skill') {
+            reactiveGameState.activeSkillCD = SKILLS[reactiveGameState.job.sk].cd;
+            let sk = reactiveGameState.job.sk;
+            let s = getStat('str'), i = getStat('int'), w = getStat('wil'), luck = getStat('luck');
+            let dScale = 1 + (reactiveGameState.diff - 1) * 0.25;
+            let sScale = 1 + (reactiveGameState.diff - 1) * 0.4;
+            let baseAvg = (getDmgEst('melee') + getDmgEst('ranged')) / 2;
+            let derived = calcDerivedStats();
+
+    // 輔助函數：計算屬性變化
+            const getStatDiff = (statName) => {
+                let oldVal = getStat(statName);
+                // 這裡我們無法簡單回滾狀態再計算，所以採用顯示"當前值與Buff說明"的方式
+                // 或者直接根據Buff邏輯計算預期增幅
+                return oldVal; 
+            };
+
+            // --- 完整技能列表 ---
+            if (sk === 'kid_squad') {
+                c.buffs.kidClones = 5; 
+                logMsg.push("🥷 忍法：影分身之術！(接下來 5 回合攻擊機率連擊)");
+                dmg = 0;
             } 
-            else if(r < 0.75) { c.buffs.atkDown = 3; logMsg.push("【人之初】：嘮叨說教，敵人攻擊力下降"); } 
-            else { c.buffs.atkDown=2; c.buffs.defDown=2; logMsg.push("【性本善】：精神污染，敵人攻防同時下降"); }
-        } 
-    else if(sk === 'dlss') {
-            // ★★★ 優化顯示：DLSS ★★★
-            c.buffs.dlss = 3;
-            let boostA = Math.floor(getStat('a') * 0.5); // DLSS 增加 50%
-            logMsg.push(`DLSS 開啟：敏捷大幅提升 <span style="color:#4f4">(+${boostA})</span>！`);
-        }    
-        else if(sk === 'bullseye') {
-            dmg = baseAvg * 1 * dScale; 
-            c.buffs.ignoreDef = 1; 
-            if(Math.random()*100 < derived.crit) dmg *= (derived.critDmg/100);
-            logMsg.push("紅心鎖定：無視防禦的一擊！");
-        } 
-      else if(sk === 'creatine') {
-
-            // 肌酸全屬性增加 50%
-            let boostS = Math.floor(getStat('s') * 0.5);
-            let boostA = Math.floor(getStat('a') * 0.5);
-            let boostI = Math.floor(getStat('i') * 0.5);
-            let boostW = Math.floor(getStat('w') * 0.5);
-            logMsg.push(`喝下肌酸：全屬性爆發提升！<br><span style="font-size:0.8em;color:#4f4">(力+${boostS} 敏+${boostA} 智+${boostI} 意+${boostW})</span>`);
-            
-            // 最後才應用 Buff
-            c.buffs.allUp = 2;
-      }
-        else if(sk === 'hypnosis') {
-            c.buffs.sleep = 2;
-            logMsg.push("催眠術：敵人陷入睡眠 (下次受傷必定暴擊)");
-        } 
-        else if(sk === 'shave') {
-            c.buffs.atkDown = 3; c.buffs.defDown = 3; c.buffs.accDown = 3;
-            logMsg.push("剃光頭：敵人全能力大幅削弱！");
-        } 
-        else if (sk === 'tesla_coil') {
-            dmg = baseAvg * 2 * dScale;
-            c.buffs.defDown = (1 + Math.floor(Math.random()*3));
-            logMsg.push("⚡ 特斯拉線圈：電擊破甲");
-        } 
-        else if (sk === 'pi_strike') {
-             let baseRnd = (1 + Math.random()*200) * 3.14159;
-             dmg = (baseRnd + (i * 10)) * dScale;
-             logMsg.push("🔢 圓周率打擊！");
-        } 
-        else if(sk === 'money_rain') {
-            let baseCost = (reactiveGameState.diff === 3) ? 60 : ((reactiveGameState.diff === 2) ? 40 : 20);
-            if (reactiveGameState.money >= baseCost) {
-                reactiveGameState.money -= baseCost;
-                let rawDmg = (luck * 15) + (i * 5);
-                dmg = Math.floor(rawDmg * dScale * (reactiveGameState.diff===3 ? 1.5 : 1)); 
-                c.buffs.ignoreDef = 1;
-                logMsg.push(`大撒幣：有錢使得鬼推磨 <span style="color:#ffd700">$${baseCost}</span> ！`);
-            } else {
-                dmg = (5 + s) * dScale;
-                logMsg.push("大撒幣：沒錢了... ");
-            }
-        } 
-        else if(sk === 'waterfall') {
-            reactiveGameState.hp -= Math.floor(reactiveGameState.hp * 0.1); 
-            dmg = (1.1 + Math.random()*3.9) * baseAvg * dScale;
-            logMsg.push("Kim Setup：高風險高回報一擊！");
-        } 
-        else if(sk === 'drift') {
-            c.buffs.drift = 5;
-            logMsg.push("東京漂移：進入連擊狀態！");
-        } 
-       else if(sk === 'matrix') {
-            // ★★★ 優化顯示：Matrix ★★★
-            c.buffs.matrix = 3;
-            logMsg.push("Matrix：看穿代碼，閃避極限提升 <span style='color:#4f4'>(+50%)</span>！");
-        } 
-        else if(sk === 'one_cue') {
-            if(c.isBoss) {
-                dmg = Math.floor(c.hp * 0.15); 
-                logMsg.push("庖丁解牛!");
-            } else if (Math.random() < 0.15) { 
-                dmg = c.hp; logMsg.push("一Q清檯！"); 
-            } else { 
-                dmg = baseAvg * 2 * dScale; logMsg.push("大力出奇跡！"); 
-            }
-        } 
-        else if(sk === 'holy_chant') {
-            if(c.isBoss) { dmg = 0; logMsg.push("Boss 免疫此效果..."); }
-            else {
-                let cost = 15;
-                if (reactiveGameState.san > cost) {
-                    reactiveGameState.san -= cost;
-                    let pct = 0.2 + Math.random()*0.4; 
-                    dmg = Math.floor(c.hp * pct); 
-                    c.playerShield = Math.floor(dmg * 0.5 * sScale);
-                    logMsg.push(`聖靈吟唱：消耗 SAN 值，削減敵人血量並獲得護盾`);
-                } else {
-                    logMsg.push("聖靈吟唱：信仰不足 (SAN過低)...");
+            else if(sk === 'chuunibyou') {
+                c.buffs.chuunibyou = 3; 
+                c.buffs.chuuniVal = Math.floor(baseAvg * Math.random() * dScale); 
+                dmg = (baseAvg * dScale) + c.buffs.chuuniVal;
+                logMsg.push(`中二病發作！攻擊力波動上升！`);
+            } 
+            else if (sk === 'snipe') {
+                dmg = baseAvg * 2 * dScale;
+                if(Math.random()*100 < derived.crit) dmg *= (derived.critDmg/100);
+                logMsg.push("🎯 狙擊鎖定！");
+            } 
+            else if(sk === 'first_aid') {
+                let pct = 0.5 * sScale; 
+                let h = Math.floor((reactiveGameState.maxHp - reactiveGameState.hp) * pct); 
+                reactiveGameState.hp += h;
+                logMsg.push(`急救處理：恢復了 ${h} 點生命`);
+            } 
+            else if(sk === 'fate_throw') {
+                let mult = 0.5 + Math.random() * 3.5; 
+                dmg = baseAvg * mult * dScale; 
+                if(Math.random()*100 < derived.crit) dmg *= (derived.critDmg/100);
+                logMsg.push("命運一擲！");
+            } 
+            else if(sk === 'weakness_scan') {
+                c.buffs.defDown = 3;
+                logMsg.push("弱點分析：敵人防禦力大幅下降 (3回合)");
+            } 
+            else if(sk === 'risk_manage') {
+                c.playerShield = Math.floor(reactiveGameState.maxHp * sScale);
+                logMsg.push(`風險管理：獲得鉅額護盾 (${c.playerShield})`);
+            } 
+            else if (sk === 'kungfu_panda') {
+                let r = Math.random();
+                if(r < 0.01 && !c.isBoss) { dmg = c.hp; logMsg.push("【無錫碎骨指】直接秒殺！"); }
+                else if(r < 0.5) { 
+                    let h = Math.floor((reactiveGameState.maxHp-reactiveGameState.hp)*0.5 * sScale); 
+                    reactiveGameState.hp += h; logMsg.push(`【吞併Diliveroo】恢復了 ${h} 點生命`); 
+                }
+                else { 
+                    c.isStunned = true; c.buffs.stun = 2; 
+                    dmg = baseAvg * 1.5 * dScale; 
+                    logMsg.push("【衝擊Keeta】造成傷害並暈眩敵人！"); 
                 }
             }
-        } 
-        else if(sk === 'talisman') {
-            if (c.buffs.zombie) {
-                dmg = baseAvg * 2 * dScale;
-                c.isStunned = true; c.buffs.stun = 1;
-                logMsg.push(`天師鎮屍！重創僵屍並定身！`);
-            } else {
-                c.isStunned = true; c.buffs.zombieCountdown = 3; 
-                logMsg.push("急急如律令！貼符定身，<strong style='color:#fa0'>3回合後</strong>轉化敵人");
-            }
-        } 
-        else if(sk === 'welding') {
-            c.buffs.accDown = 5; c.buffs.defDown = 5;
-            logMsg.push("全身焊接：封死敵人關節，命中防禦下降");
-        } 
-        else if(sk === 'raptor') {
-            if (c.isBoss) {
-                dmg = baseAvg * 2 * dScale;
-                c.buffs.atkDown = 3; 
-                logMsg.push("速龍突襲：火力壓制！(Boss 攻擊下降)");
-            } else {
-                dmg = baseAvg * 2 * dScale; 
-                if(Math.random() < 0.05) { dmg = c.hp; logMsg.push("速龍突襲：當場逮捕！"); }
-                else logMsg.push("速龍突襲：強力撕咬！");
-            }
-        } 
-        else if(sk === 'redbull') {
-            // ★★★ 優化顯示：RedBull ★★★
-            c.buffs.redbull = 3;
-            // 30% 提升
-            let boostA = Math.floor(getStat('a') * 0.3);
-            logMsg.push(`Red Bull：送你一對翼！閃避與攻擊提升 <span style="color:#4f4">(敏+${boostA})</span>`);
-        } 
-        else if(sk === 'high_pitch') {
-            // === 平衡修正：消耗大幅降低至 2 (避免戰鬥後餓死) ===
-            if (reactiveGameState.food >= 2) {
-                reactiveGameState.food -= 2;
-                
-                // 1. 傷害：1.5倍 + 無視防禦 (音波穿透)
+            else if(sk === 'flash_bang') {
+                c.buffs.blind = 3; c.buffs.atkDown = 3;
+                logMsg.push("投擲閃光彈！敵人降攻致盲");
+            } 
+            else if(sk === 'rage') {
+                let hpCost = Math.floor(reactiveGameState.hp * 0.2);
+                reactiveGameState.hp = Math.max(1, reactiveGameState.hp - hpCost);
+                dmg = s * 8 * dScale; 
+                let strBonus = s * (reactiveGameState.diff === 3 ? 12 : 6); 
+                let shieldGain = Math.floor((hpCost * (reactiveGameState.diff === 3 ? 3 : 2)) + strBonus);
+                c.playerShield = shieldGain;
+                c.buffs.rageShieldTimer = 2;
+                logMsg.push(`狂暴：犧牲血量，爆發 <strong style="color:#4f4">${shieldGain} 肌肉護盾</strong> (2回合)！`);
+            } 
+            else if(sk === 'god_hand') {
+                c.buffs.godBlock = 1; 
+                logMsg.push("神之一手：絕對防禦架勢！(下回合必反擊)");
+            } 
+            else if(sk === 'tree_strike') {
                 dmg = baseAvg * 1.5 * dScale; 
+                c.buffs.root = 2; c.isStunned = true;
+                logMsg.push("鏟泥種樹：敵人被樹根纏繞定身！");
+            } 
+            else if(sk === 'risk_hedge') {
+                c.buffs.hedge = 1; 
+                c.buffs.hedgeAtk = Math.floor(c.atk * dScale); 
+                c.buffs.hedgeTurns = 2;
+                logMsg.push(`風險對沖: 免疫傷害，轉化敵攻為加成`);
+            } 
+            else if(sk === 'dictionary') {
+                let r = Math.random();
+                if(r < 0.25) { dmg = baseAvg * 5 * dScale; logMsg.push("【習相遠】：習帝之擊！"); } 
+                else if(r < 0.5) { 
+                    c.playerShield = Math.floor(w * 5 * sScale); 
+                    logMsg.push(`【性相近】：獲得聖賢護盾 (${c.playerShield})`); 
+                } 
+                else if(r < 0.75) { c.buffs.atkDown = 3; logMsg.push("【人之初】：嘮叨說教，敵人攻擊力下降"); } 
+                else { c.buffs.atkDown=2; c.buffs.defDown=2; logMsg.push("【性本善】：精神污染，敵人攻防同時下降"); }
+            } 
+            else if(sk === 'dlss') {
+                // ★★★ 優化顯示：DLSS ★★★
+                c.buffs.dlss = 3;
+                let boostA = Math.floor(getStat('a') * 0.5); // DLSS 增加 50%
+                logMsg.push(`DLSS 開啟：敏捷大幅提升 <span style="color:#4f4">(+${boostA})</span>！`);
+            }    
+            else if(sk === 'bullseye') {
+                dmg = baseAvg * 1 * dScale; 
                 c.buffs.ignoreDef = 1; 
+                if(Math.random()*100 < derived.crit) dmg *= (derived.critDmg/100);
+                logMsg.push("紅心鎖定：無視防禦的一擊！");
+            } 
+            else if(sk === 'creatine') {
 
-                // 2. 控制：Debuff 持續 3 回合
-                c.buffs.atkDown = 3; 
-                c.buffs.accDown = 3;
-
-                // 3. ★★★ 新增：追星族的熱情，恢復少量 SAN 值 ★★★
-                // 這樣阿孫越打越 high，符合人設
-                let sanRec = 3;
-                reactiveGameState.san = Math.min(100, reactiveGameState.san + sanRec);
-
-                logMsg.push(`飆高音：<span style='color:#d0f'>高頻穿腦！</span>(SAN+${sanRec}) 無視防禦傷害，敵人攻命下降`);
-            } else {
-                logMsg.push("肚子太餓，丹田無力，唱不上去了...");
-                dmg = 0; 
+                    // 肌酸全屬性增加 50%
+                    let boostS = Math.floor(getStat('s') * 0.5);
+                    let boostA = Math.floor(getStat('a') * 0.5);
+                    let boostI = Math.floor(getStat('i') * 0.5);
+                    let boostW = Math.floor(getStat('w') * 0.5);
+                    logMsg.push(`喝下肌酸：全屬性爆發提升！<br><span style="font-size:0.8em;color:#4f4">(力+${boostS} 敏+${boostA} 智+${boostI} 意+${boostW})</span>`);
+                    
+                    // 最後才應用 Buff
+                    c.buffs.allUp = 2;
             }
-        }
-
-    } else if (act === 'defend') {
-        reactiveGameState.isDefending = true; reactiveGameState.playerDefCD = 3; logMsg.push("🛡️ 防禦姿態");
-    } else if (act === 'flee') {
-        if (Math.random() < 0.5) { campPhase(); return true; }
-        logMsg.push("🏃 逃跑失敗");
-    }
-
-    // 讀取武器特效
-        let weapon = (act === 'melee') ? reactiveGameState.eq.melee : reactiveGameState.eq.ranged;
-        let fx = weapon.fx;
-        
-        if (fx && dmg > 0) {
-            // 1. 暈眩
-            if (fx.t === 'stun_hit' && Math.random() < fx.v) {
-                c.buffs.stun = 1; c.isStunned = true;
-                logMsg.push(`<span style="color:#fa0">⚡ 武器特效：暈眩！</span>`);
-            }
-            // 2. 流血
-            if (fx.t === 'bleed_hit' && Math.random() < fx.v) {
-                c.buffs.bleed = 3;
-                logMsg.push(`<span style="color:#f44">🩸 武器特效：流血！</span>`);
-            }
-            // 3. 雙重打擊
-            if (fx.t === 'double_hit' && Math.random() < fx.v) {
-                hits++; // 增加連擊數
-                logMsg.push(`⚡ 武器特效：連擊！`);
-            }
-            // 4. 滿血增傷 (First Strike)
-            if (fx.t === 'first_strike' && c.hp >= c.maxHp * 0.95) {
-                dmg = Math.floor(dmg * (1 + fx.v));
-                logMsg.push(`⚔️ 滿血增傷！`);
-            }
-            // 5. 斬殺 (Execute)
-            if (fx.t === 'execute' && c.hp < c.maxHp * 0.3) {
-                dmg = Math.floor(dmg * (1 + fx.v));
-                logMsg.push(`💀 斬殺！`);
-            }
-            // 6. 打錢 (Gold Hit)
-            if (fx.t === 'gold_hit') {
-                reactiveGameState.money += Math.floor(fx.v);
-            }
-            // 7. 特攻 (Slayer) - 簡單版，所有都加傷
-            if (fx.t === 'zombie_killer' || fx.t === 'mech_killer') {
-                 dmg = Math.floor(dmg * (1 + fx.v)); // 暫時全部生效，之後可判斷 c.n
-            }
-            // 8. 無視防禦
-            if (fx.t === 'ignore_def' && Math.random() < fx.v) {
-                c.buffs.ignoreDef = 1;
-                logMsg.push(`🛡️ 無視防禦！`);
-            }
-        }
-     
-// === 4. 最終傷害扣除 (含平衡修正) ===
-        if (dmg > 0) {
-            // 讀取固定防禦力
-            let eDef = c.def || 0;
-            
-            // 應用 Debuff
-            if (c.buffs.defDown) eDef = Math.floor(eDef * 0.5);
-            if (c.buffs.ignoreDef) eDef = 0;
-
-            // 計算減傷後傷害
-            let reducedDmg = dmg - eDef;
-            
-            // ★★★ 核心修正：最小傷害機制 (10% 面板傷害) ★★★
-            // 確保即使不破防，也能造成 10% 的傷害，避免絕望感
-            let minDmg = Math.floor(dmg * 0.1); 
-            let realDmg = Math.max(minDmg, reducedDmg);
-            realDmg = Math.max(1, Math.floor(realDmg)); // 保底 1 點
-            // ==========================================
-
-            // 詞綴減傷 (百分比)
-            if (c.defP > 0 && !c.buffs.ignoreDef) {
-                realDmg = Math.floor(realDmg * (1 - c.defP));
-            }
-
-            // 護盾抵扣 (保持不變)
-            if (c.enemyShield > 0) {
-                if (c.enemyShield >= realDmg) {
-                    c.enemyShield -= realDmg; realDmg = 0; logMsg.push("🛡️ 傷害被護盾抵擋");
+            else if(sk === 'hypnosis') {
+                c.buffs.sleep = 2;
+                logMsg.push("催眠術：敵人陷入睡眠 (下次受傷必定暴擊)");
+            } 
+            else if(sk === 'shave') {
+                c.buffs.atkDown = 3; c.buffs.defDown = 3; c.buffs.accDown = 3;
+                logMsg.push("剃光頭：敵人全能力大幅削弱！");
+            } 
+            else if (sk === 'tesla_coil') {
+                dmg = baseAvg * 2 * dScale;
+                c.buffs.defDown = (1 + Math.floor(Math.random()*3));
+                logMsg.push("⚡ 特斯拉線圈：電擊破甲");
+            } 
+            else if (sk === 'pi_strike') {
+                let baseRnd = (1 + Math.random()*200) * 3.14159;
+                dmg = (baseRnd + (i * 10)) * dScale;
+                logMsg.push("🔢 圓周率打擊！");
+            } 
+            else if(sk === 'money_rain') {
+                let baseCost = (reactiveGameState.diff === 3) ? 60 : ((reactiveGameState.diff === 2) ? 40 : 20);
+                if (reactiveGameState.money >= baseCost) {
+                    reactiveGameState.money -= baseCost;
+                    let rawDmg = (luck * 15) + (i * 5);
+                    dmg = Math.floor(rawDmg * dScale * (reactiveGameState.diff===3 ? 1.5 : 1)); 
+                    c.buffs.ignoreDef = 1;
+                    logMsg.push(`大撒幣：有錢使得鬼推磨 <span style="color:#ffd700">$${baseCost}</span> ！`);
                 } else {
-                    realDmg -= c.enemyShield; c.enemyShield = 0; logMsg.push("⚡ 擊破護盾！");
+                    dmg = (5 + s) * dScale;
+                    logMsg.push("大撒幣：沒錢了... ");
+                }
+            } 
+            else if(sk === 'waterfall') {
+                reactiveGameState.hp -= Math.floor(reactiveGameState.hp * 0.1); 
+                dmg = (1.1 + Math.random()*3.9) * baseAvg * dScale;
+                logMsg.push("Kim Setup：高風險高回報一擊！");
+            } 
+            else if(sk === 'drift') {
+                c.buffs.drift = 5;
+                logMsg.push("東京漂移：進入連擊狀態！");
+            } 
+            else if(sk === 'matrix') {
+                // ★★★ 優化顯示：Matrix ★★★
+                c.buffs.matrix = 3;
+                logMsg.push("Matrix：看穿代碼，閃避極限提升 <span style='color:#4f4'>(+50%)</span>！");
+            } 
+            else if(sk === 'one_cue') {
+                if(c.isBoss) {
+                    dmg = Math.floor(c.hp * 0.15); 
+                    logMsg.push("庖丁解牛!");
+                } else if (Math.random() < 0.15) { 
+                    dmg = c.hp; logMsg.push("一Q清檯！"); 
+                } else { 
+                    dmg = baseAvg * 2 * dScale; logMsg.push("大力出奇跡！"); 
+                }
+            } 
+            else if(sk === 'holy_chant') {
+                if(c.isBoss) { dmg = 0; logMsg.push("Boss 免疫此效果..."); }
+                else {
+                    let cost = 15;
+                    if (reactiveGameState.san > cost) {
+                        reactiveGameState.san -= cost;
+                        let pct = 0.2 + Math.random()*0.4; 
+                        dmg = Math.floor(c.hp * pct); 
+                        c.playerShield = Math.floor(dmg * 0.5 * sScale);
+                        logMsg.push(`聖靈吟唱：消耗 SAN 值，削減敵人血量並獲得護盾`);
+                    } else {
+                        logMsg.push("聖靈吟唱：信仰不足 (SAN過低)...");
+                    }
+                }
+            } 
+            else if(sk === 'talisman') {
+                if (c.buffs.zombie) {
+                    dmg = baseAvg * 2 * dScale;
+                    c.isStunned = true; c.buffs.stun = 1;
+                    logMsg.push(`天師鎮屍！重創僵屍並定身！`);
+                } else {
+                    c.isStunned = true; c.buffs.zombieCountdown = 3; 
+                    logMsg.push("急急如律令！貼符定身，<strong style='color:#fa0'>3回合後</strong>轉化敵人");
+                }
+            } 
+            else if(sk === 'welding') {
+                c.buffs.accDown = 5; c.buffs.defDown = 5;
+                logMsg.push("全身焊接：封死敵人關節，命中防禦下降");
+            } 
+            else if(sk === 'raptor') {
+                if (c.isBoss) {
+                    dmg = baseAvg * 2 * dScale;
+                    c.buffs.atkDown = 3; 
+                    logMsg.push("速龍突襲：火力壓制！(Boss 攻擊下降)");
+                } else {
+                    dmg = baseAvg * 2 * dScale; 
+                    if(Math.random() < 0.05) { dmg = c.hp; logMsg.push("速龍突襲：當場逮捕！"); }
+                    else logMsg.push("速龍突襲：強力撕咬！");
+                }
+            } 
+            else if(sk === 'redbull') {
+                // ★★★ 優化顯示：RedBull ★★★
+                c.buffs.redbull = 3;
+                // 30% 提升
+                let boostA = Math.floor(getStat('a') * 0.3);
+                logMsg.push(`Red Bull：送你一對翼！閃避與攻擊提升 <span style="color:#4f4">(敏+${boostA})</span>`);
+            } 
+            else if(sk === 'high_pitch') {
+                // === 平衡修正：消耗大幅降低至 2 (避免戰鬥後餓死) ===
+                if (reactiveGameState.food >= 2) {
+                    reactiveGameState.food -= 2;
+                    
+                    // 1. 傷害：1.5倍 + 無視防禦 (音波穿透)
+                    dmg = baseAvg * 1.5 * dScale; 
+                    c.buffs.ignoreDef = 1; 
+
+                    // 2. 控制：Debuff 持續 3 回合
+                    c.buffs.atkDown = 3; 
+                    c.buffs.accDown = 3;
+
+                    // 3. ★★★ 新增：追星族的熱情，恢復少量 SAN 值 ★★★
+                    // 這樣阿孫越打越 high，符合人設
+                    let sanRec = 3;
+                    reactiveGameState.san = Math.min(100, reactiveGameState.san + sanRec);
+
+                    logMsg.push(`飆高音：<span style='color:#d0f'>高頻穿腦！</span>(SAN+${sanRec}) 無視防禦傷害，敵人攻命下降`);
+                } else {
+                    logMsg.push("肚子太餓，丹田無力，唱不上去了...");
+                    dmg = 0; 
                 }
             }
 
-            // 執行扣血
-            if (realDmg > 0) {
-                c.hp -= realDmg;
-                logMsg.push(`💥 造成 <strong>${realDmg}</strong> 點傷害`);
+        } else if (act === 'defend') {
+            reactiveGameState.isDefending = true; reactiveGameState.playerDefCD = 3; logMsg.push("🛡️ 防禦姿態");
+        } else if (act === 'flee') {
+            if (Math.random() < 0.5) { campPhase(); return true; }
+            logMsg.push("🏃 逃跑失敗");
+        }
+
+        // 讀取武器特效
+            let weapon = (act === 'melee') ? reactiveGameState.eq.melee : reactiveGameState.eq.ranged;
+            let fx = weapon.fx;
+            
+            if (fx && dmg > 0) {
+                // 1. 暈眩
+                if (fx.t === 'stun_hit' && Math.random() < fx.v) {
+                    c.buffs.stun = 1; c.isStunned = true;
+                    logMsg.push(`<span style="color:#fa0">⚡ 武器特效：暈眩！</span>`);
+                }
+                // 2. 流血
+                if (fx.t === 'bleed_hit' && Math.random() < fx.v) {
+                    c.buffs.bleed = 3;
+                    logMsg.push(`<span style="color:#f44">🩸 武器特效：流血！</span>`);
+                }
+                // 3. 雙重打擊
+                if (fx.t === 'double_hit' && Math.random() < fx.v) {
+                    hits++; // 增加連擊數
+                    logMsg.push(`⚡ 武器特效：連擊！`);
+                }
+                // 4. 滿血增傷 (First Strike)
+                if (fx.t === 'first_strike' && c.hp >= c.maxHp * 0.95) {
+                    dmg = Math.floor(dmg * (1 + fx.v));
+                    logMsg.push(`⚔️ 滿血增傷！`);
+                }
+                // 5. 斬殺 (Execute)
+                if (fx.t === 'execute' && c.hp < c.maxHp * 0.3) {
+                    dmg = Math.floor(dmg * (1 + fx.v));
+                    logMsg.push(`💀 斬殺！`);
+                }
+                // 6. 打錢 (Gold Hit)
+                if (fx.t === 'gold_hit') {
+                    reactiveGameState.money += Math.floor(fx.v);
+                }
+                // 7. 特攻 (Slayer) - 簡單版，所有都加傷
+                if (fx.t === 'zombie_killer' || fx.t === 'mech_killer') {
+                    dmg = Math.floor(dmg * (1 + fx.v)); // 暫時全部生效，之後可判斷 c.n
+                }
+                // 8. 無視防禦
+                if (fx.t === 'ignore_def' && Math.random() < fx.v) {
+                    c.buffs.ignoreDef = 1;
+                    logMsg.push(`🛡️ 無視防禦！`);
+                }
+            }
+        
+            // === 4. 最終傷害扣除 (含平衡修正) ===
+            if (dmg > 0) {
+                // 讀取固定防禦力
+                let eDef = c.def || 0;
                 
-                // ... (反傷與日誌代碼保持不變) ...
-                if (c.prefixEff === 'thorns' || c.prefixEff === 'thorns_light' || c.prefixEff === 'thorns_heavy') {
-                    let rate = (c.prefixEff==='thorns_heavy') ? 0.4 : (c.prefixEff==='thorns') ? 0.2 : 0.1;
-                    let thornsDmg = Math.floor(realDmg * rate);
-                    if (thornsDmg > 0) {
-                        reactiveGameState.hp -= thornsDmg;
-                        logMsg.push(`<span style="color:#f44">⚡ 受到反傷 -${thornsDmg}</span>`);
+                // 應用 Debuff
+                if (c.buffs.defDown) eDef = Math.floor(eDef * 0.5);
+                if (c.buffs.ignoreDef) eDef = 0;
+
+                // 計算減傷後傷害
+                let reducedDmg = dmg - eDef;
+                
+                // ★★★ 核心修正：最小傷害機制 (10% 面板傷害) ★★★
+                // 確保即使不破防，也能造成 10% 的傷害，避免絕望感
+                let minDmg = Math.floor(dmg * 0.1); 
+                let realDmg = Math.max(minDmg, reducedDmg);
+                realDmg = Math.max(1, Math.floor(realDmg)); // 保底 1 點
+                // ==========================================
+                // 詞綴減傷 (百分比)
+                if (c.defP > 0 && !c.buffs.ignoreDef) {
+                    realDmg = Math.floor(realDmg * (1 - c.defP));
+                }
+
+                // 護盾抵扣 (保持不變)
+                if (c.enemyShield > 0) {
+                    if (c.enemyShield >= realDmg) {
+                        c.enemyShield -= realDmg; realDmg = 0; logMsg.push("🛡️ 傷害被護盾抵擋");
+                    } else {
+                        realDmg -= c.enemyShield; c.enemyShield = 0; logMsg.push("⚡ 擊破護盾！");
                     }
                 }
 
-                let isCritFlavor = (dmg > getDmgEst(act) * 1.2); 
-                let flavor = getCombatFlavor('你', c.n, act, realDmg, isCritFlavor, false);
-                logMsg.push(`<div class="log-combat-h">${flavor}</div>`);
+                // 執行扣血
+                if (realDmg > 0) {
+                    c.hp -= realDmg;
+                    logMsg.push(`💥 造成 <strong>${realDmg}</strong> 點傷害`);
+                    
+                    // ... (反傷與日誌代碼保持不變) ...
+                    if (c.prefixEff === 'thorns' || c.prefixEff === 'thorns_light' || c.prefixEff === 'thorns_heavy') {
+                        let rate = (c.prefixEff==='thorns_heavy') ? 0.4 : (c.prefixEff==='thorns') ? 0.2 : 0.1;
+                        let thornsDmg = Math.floor(realDmg * rate);
+                        if (thornsDmg > 0) {
+                            reactiveGameState.hp -= thornsDmg;
+                            logMsg.push(`<span style="color:#f44">⚡ 受到反傷 -${thornsDmg}</span>`);
+                        }
+                    }
 
-                reactiveGameState.lastDmg = realDmg;            
-                triggerShake();
+                    let isCritFlavor = (dmg > getDmgEst(act) * 1.2); 
+                    let flavor = getCombatFlavor('你', c.n, act, realDmg, isCritFlavor, false);
+                    logMsg.push(`<div class="log-combat-h">${flavor}</div>`);
+
+                    reactiveGameState.lastDmg = realDmg;            
+                    triggerShake();
+                }
             }
-        }
 
-    return false; // not fled
+        return false; // not fled
     };
 
     // === 3. 執行流程控制 ===
@@ -1443,7 +1440,8 @@ export function processEnemyTurn(c, logMsg) {
 
 // combat
 export function checkCombatEnd(c, logMsg) {
-    log('戰鬥', logMsg.join(' ')); updateUI();
+    log('戰鬥', logMsg.join(' ')); 
+    updateUI();
     if(reactiveGameState.hp<=0) gameOver(`被 ${c.n} 殺死`);
     else if(c.hp<=0) { 
         log('戰鬥', '勝利！', 'c-gain'); 
@@ -1471,7 +1469,7 @@ export function checkCombatEnd(c, logMsg) {
         else { 
             let t=['melee','ranged','head','body','acc','med','throwable'][Math.floor(Math.random()*7)];
             if(t==='med'||t==='throwable') t = (Math.random()<0.5)?'med':'throwable';
-            let lootItem = createItem(t,'random',0);
+            let lootItem = createItem(t,'random', 0);
             showLootModal(lootItem, t, continueExploration);
         }
     } else {

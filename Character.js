@@ -1,5 +1,6 @@
-import {reactiveGameState, log} from './GameMain.js';
-import {updateUI} from './UIManager.js';
+import * as Constant from './GameData.js';
+import { reactiveGameState, log } from './GameMain.js';
+import { updateUI, openModal } from './UIManager.js';
 
 // character
 export function recalcMaxHp() {
@@ -52,7 +53,7 @@ export function checkLevelUp() {
         reactiveGameState.level++;
         recalcMaxHp(); // 升級可能影響屬性，從而影響HP上限
         reactiveGameState.hp = reactiveGameState.maxHp; 
-        let stats = ['s','a','i','w'];
+        let stats = ['str','agi','int','wil'];
         let s = stats[Math.floor(Math.random()*stats.length)];
         reactiveGameState.stats[s]++;
         

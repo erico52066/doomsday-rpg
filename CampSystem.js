@@ -208,7 +208,7 @@ export function exploreSetup() {
     });
     // html += `</div>`;
     // document.getElementById('action-area').innerHTML = html;
-    Alpine.store('ui').showCampAction = false;
+    Alpine.store('ui').showAction = Constant.ACTION.explore;
 }
 window.exploreSetup = exploreSetup;
 

@@ -7,7 +7,7 @@ import * as StorySystem from './StorySystem.js'
 import * as UIManager from './UIManager.js'
 
 document.addEventListener('alpine:init', () => {
-    Alpine.data('Global', ()=>({
+    Alpine.data('update', ()=>({
         updateLog:"12/10/25:新增角色|平衡難度|新增角色裝備|新藥品系統",
     }));
 
@@ -28,16 +28,16 @@ document.addEventListener('alpine:init', () => {
     }));
 
     Alpine.store('ui', {
-        showStart:true,
-        showJobSoslection:false,
+        showStart: true,
+        showJobSoslection: false,
         showJobsIntro: false,
         showJobs: false,
         jobColor: '#f44',
-        showMBTI:false,
-        showGameScreen:false,
-        showCampAction:false,
-        showModal:false,
-        showEnemy:false,
+        showMBTI: false,
+        showGameScreen: false,
+        showAction: false,
+        showModal: false,
+        showEnemy: false,
         bagCapacity: "(0/4)",
         bagColor: '#aaa',
         weather: "☀️ 晴朗",
@@ -54,6 +54,14 @@ document.addEventListener('alpine:init', () => {
     })
     Alpine.store('enemy', {})
     Alpine.store('player', {})
+    Alpine.store('stat', {})
+    Alpine.store('loot', {
+        showModal: false,
+        isEquip: false,
+        newAmmo: 0,
+        isJobNative: false,
+
+    })
  });
 
 // ==================== 1. 遊戲核心變數 ====================
@@ -209,8 +217,15 @@ function showJobIntro() {
         content: reactiveGameState.job.background,
         class: "story-text",
         style: "'border-color':var(--r-legend)",
-        buttonAction: startJourney,
-        buttonText: "開始旅程",
+        buttons: [{
+            action: startJourney,
+            text: "開始旅程"
+            
+        }],
+        layout: Constant.MODAL.story,
+
+        // buttonAction: startJourney,
+        // buttonText: "開始旅程",
     }
     UIManager.openModal(modal);
 
@@ -224,7 +239,7 @@ function startJourney() {
     reactiveGameState.day = 1; 
     log('系統', '旅程開始。', 'c-story');
     // updateUI();
-    renderCampActions(); 
+    UIManager.renderCampActions(); 
 }
 
 // GameMain
@@ -235,7 +250,7 @@ export function log(t, m, c='') {
 }
 
 // game main
-function gameOver(reason) { 
+export function gameOver(reason) { 
     reactiveGameState.alive = false;
     hideGameContainer();
     let btnHtml = `<button onclick="location.reload()" style="border-color:#f44; color:#f44; width:100%">💀 重新開始 (F5)</button>`;
@@ -394,7 +409,9 @@ const globalFunctions = {
     performSkill: CombatSystem.performSkill,
     finishSetup,
     continueExploration: CampSystem.continueExploration,
-    exploreSetup: CampSystem.exploreSetup
+    exploreSetup: CampSystem.exploreSetup,
+    MODAL: Constant.MODAL,
+    ACTION: Constant.ACTION,
 };
 
 Object.assign(window, globalFunctions);

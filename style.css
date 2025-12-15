@@ -21,6 +21,19 @@
 	--xp-color: #b5f;
 }
 
+#job-container {
+	width: 95%; 
+	max-width: 1000px; 
+	max-height: 65vh; 
+	overflow-y: auto; 
+	display: flex; 
+	grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); 
+	gap: 15px; 
+	padding: 5px;
+	align-content: start;
+	justify-content: center;
+}
+
 /* === 戰鬥介面極度昇華版 === */
 /* 1. 敵人面板：高科技戰術風格 */
 #enemy-area {
